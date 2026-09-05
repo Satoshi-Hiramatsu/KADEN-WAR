@@ -140,9 +140,9 @@ input[type="number"] { width: 120px; }
 
 /* 役員会議（Meeting） */
 .meeting-header { display: flex; flex-direction: column; gap: 14px; }
-.meeting-lead { display: flex; align-items: center; gap: 12px; background: #f0ebe0; padding: 12px 16px; border-left: 4px solid #3c5448; }
+.meeting-lead { display: flex; align-items: center; gap: 12px; background: #f0ebe0; padding: 12px 16px; border-left: 4px solid #3c5448; color: #253c36; }
 .meeting-lead p { margin: 0; }
-.meeting-president-card { display: flex; gap: 16px; align-items: center; background: #fffcf4; border: 1px solid #c9c4b3; padding: 12px 16px; }
+.meeting-president-card { display: flex; gap: 16px; align-items: center; background: #fffcf4; border: 1px solid #c9c4b3; padding: 12px 16px; color: #253c36; }
 .meeting-speech { margin: 4px 0 0; font-style: italic; color: #354a43; }
 
 .proposals-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-top: 14px; }
@@ -209,8 +209,9 @@ input[type="number"] { width: 120px; }
 .market-table-wrap { flex: 1; min-width: 280px; }
 
 /* 社長室（Office）強化パーツ */
-.command-banner { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; background: #edf2ea; border: 1px solid #b8c8b4; border-left: 5px solid #2f6b45; padding: 12px 18px; margin: 12px 0; }
+.command-banner { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; background: #edf2ea; border: 1px solid #b8c8b4; border-left: 5px solid #2f6b45; padding: 12px 18px; margin: 12px 0; color: #253c36; }
 .meeting-prompt { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 260px; }
+.meeting-prompt strong { color: #1e332c; }
 .meeting-prompt p { margin: 2px 0 0; font-size: .84rem; color: #425046; }
 .news-board { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 8px; }
 .news-card { border: 1px solid #d4cca6; background: #fffdf5; padding: 12px; border-top: 3px solid #b8860b; }
@@ -283,6 +284,13 @@ input[type="number"] { width: 120px; }
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding-bottom: 8px;
 }
+
+/* シーン写真に直接乗る文字は、白背景用の暗い配色を上書きして視認性を確保する */
+.scene-overlay .executive-name .role { color: #d7e4d0; }
+.scene-overlay .executive-line { color: #f2f5ea; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75); }
+.scene-overlay p.warning { color: #ffb37a; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75); }
+.scene-overlay .metrics dt { color: #d7ddc9; }
+.scene-overlay .metrics dd small { color: #cdd6c9; }
 
 .product-sprite {
   image-rendering: pixelated;

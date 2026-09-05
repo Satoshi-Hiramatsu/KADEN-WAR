@@ -1,6 +1,6 @@
 {
   "name": "kaden-war",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "private": true,
   "type": "module",
   "engines": {
@@ -17,7 +17,9 @@
     "api:dev": "wrangler dev --config apps/api/wrangler.jsonc --local --ip 127.0.0.1 --port 8787",
     "api:types": "wrangler types --config apps/api/wrangler.jsonc apps/api/worker-configuration.d.ts",
     "api:build": "wrangler deploy --config apps/api/wrangler.jsonc --dry-run --outdir dist/api",
-    "db:migrate": "wrangler d1 migrations apply kaden-war-poc --local --config apps/api/wrangler.jsonc"
+    "db:migrate": "wrangler d1 migrations apply kaden-war-poc --local --config apps/api/wrangler.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply kaden-war-poc --remote --config apps/api/wrangler.jsonc",
+    "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy --config apps/api/wrangler.jsonc"
   },
   "dependencies": {
     "react": "19.2.8",

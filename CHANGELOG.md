@@ -2,6 +2,31 @@
 
 リポジトリの更新履歴です。ゲーム製品版v1.0の完成・公開を示すものではありません。
 
+## V0.0.6 — 2026-09-06 / Cloudflare本番公開（molkz.com）とREADMEビジュアル刷新
+
+対応: Cloudflare Workers Static AssetsおよびD1による本番公開の完了、GitHub READMEのゲーム内スクリーンショット統合による全面ビジュアルリッチ化、シーン背景上のテキストコントラスト改善、バージョン0.0.6への引き上げ。
+
+- **Cloudflare本番エッジ配信・データベース公開**:
+  - Cloudflare Workers Static Assetsにより、React/Viteシングルページアプリケーション（SPA）と `/api/*` Workerを単一デプロイに統合。
+  - 独自ドメイン [https://molkz.com/](https://molkz.com/) にて本番公開。PCブラウザおよびモバイル端末から即時プレイ可能。
+  - 本番D1データベース `kaden-war-poc`（APACリージョン）を作成し、マイグレーション `0001_poc.sql` を適用してWorkerへバインド。
+  - `package.json` に `npm run deploy`、`npm run db:migrate:remote` スクリプトを追加し、`apps/api/wrangler.jsonc` にSPA配信ルーティング・カスタムドメイン設定を明記。
+- **GitHub向けREADMEの全面リッチ化・ゲーム内スクリーンショット統合**:
+  - Playwrightを用いて、ブラウザ上で実際に動作する全9画面（タイトル、社長室、役員会議、研究所、工場、販売本部、人事部、経理部、歴代名機図鑑）の高解像度スクリーンショットを自動撮影し、`docs/screenshots/` に収録。
+  - READMEにゲーム画面ギャラリー、経営コアサイクルのアスキーアート図解、キャスト（役員・ライバル・NPC）一覧、昭和〜平成の家電スプライト一覧、アーキテクチャ図を追加。
+  - スクリーンショット自動撮影用スクリプト `scripts/capture-screenshots.mjs` を追加。
+- **シーン背景上のテキストコントラスト修正**:
+  - 社長室・役員会議・工場などシーン写真背景（`.scene-overlay`）に直接表示される見出し・警告文・指標ラベルが、白背景用の暗い配色を継承して読みにくくなっていた問題を修正。
+  - 明るい背景ボックス（`.command-banner` / `.meeting-lead` / `.meeting-president-card`）側も、暗いオーバーレイの白文字色を継承して逆に読みにくくなっていた問題をあわせて修正。
+- `package.json` の重複した `version` キーを解消。
+
+### 検証結果と制約
+
+- `npm run check` がコード0で成功。TypeScript厳格型検査（Web・API）、ESLint、単体・結合テスト36件、Web本番ビルド、Worker dry-runを確認。
+- Playwrightを用いたローカルプレビュー環境での全9画面の自動スクリーンショットキャプチャ（`scripts/capture-screenshots.mjs`）が正常終了し、破損のないRetina PNG画像が `docs/screenshots/` に生成されることを確認。
+- 本番URL `https://molkz.com/` へのHTTPアクセスにより、HTML配信・SPAバンドルの応答を確認。
+- 未検証・未実装: IndexedDBによるローカル保存・再開（S5）、競合AIの高度な自律意思決定（S4）、規格戦争・特許（S6〜S8）、クラウドセーブ同期（S10）。
+
 ## V0.0.5 — 2026-09-06 / 本格経営SLG要素の拡充・全画像アセット統合・UI刷新
 
 対応: 光栄（コーエー）経営SLG的要素の導入、外部生成AI画像アセット群（全100点超）のゲーム内完全統合、フォントアイコン完全排除とSVG化、R01（製品設計・改良・スプライト展示）、R02（財務・生産）、R03（販売・広告・シェア分析）、R05（人事・士気）、R06（競合動向・ライバル顔）、R07（シナリオSC01・時代イベント）。S4の競合AI高度化、S5の保存は未実装。
