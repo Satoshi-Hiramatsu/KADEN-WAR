@@ -1,0 +1,42 @@
+# 家電製品スプライト画像
+
+新製品設計、カタログ、歴代名機図鑑で表示する家電製品画像（PNG形式、正方形 1:1、背景アイボリーまたは透過）を配置するフォルダです。
+仕様詳細は [docs/image-assets-specification.md](../../docs/image-assets-specification.md) を参照してください。
+
+## 命名規則（例）
+- 冷蔵庫：`refr-retro-1door-v1.png`, `refr-standard-2door-v1.png`
+- 洗濯機：`wash-wringer-round-v1.png`, `wash-twin-tub-v1.png`
+- テレビ：`tv-vacuum-tube-v1.png`, `tv-furniture-color-v1.png`
+
+## 生成記録
+- `refr-1960-1door-v1.png`：1960年代1ドア冷蔵庫。ElevenLabs Creative(gpt-image-2、役員原画参照)で生成。承認済み。
+- `refr-1970-2door-v1.png`：1970年代2ドア冷蔵庫。同上。承認済み。
+- `refr-1980-3door-v1.png`：1980年代3ドア冷蔵庫。同上。承認済み。
+- `refr-2000-french-v1.png`：2000年代フレンチドア冷蔵庫。同上。承認済み。
+- `wash-1960-wringer-v1.png`：1960年代ローラー式洗濯機。同上。承認済み。
+- `wash-1970-twintub-v1.png`：1970年代二槽式洗濯機。同上。承認済み。
+- `wash-1980-automatic-v1.png`：1980年代全自動洗濯機。同上。承認済み。
+- `wash-2000-drum-v1.png`：2000年代ドラム式洗濯乾燥機。同上。承認済み。
+- `tv-1960-blackwhite-v1.png`：1960年代白黒テレビ。同上。承認済み。
+- `tv-1970-color-console-v1.png`：1970年代家具調カラーテレビ。同上。承認済み。
+- `tv-1980-crt-hifi-v1.png`：1980年代CRTハイファイテレビ。同上。承認済み。
+- `tv-2000-flat-lcd-v1.png`：2000年代薄型液晶テレビ。同上。承認済み。
+- `vtr-1970-topload-v1.png`：1970年代トップローディング式ビデオデッキ。同上。承認済み。
+- `vtr-1980-hifi-deck-v1.png`：1980年代フロントローディング式ハイファイビデオデッキ。同上。承認済み(デジタル表示部に時刻風数字あり、要確認)。
+- `audio-1960-transistor-radio-v1.png`：1960年代革ケース付き携帯トランジスタラジオ。ElevenLabs Creative(gpt-image-2、役員原画参照)で生成。承認済み。
+- `audio-1970-boombox-v1.png`：1970年代大型ラジカセ(ツインスピーカー・カセットデッキ)。同上。承認済み。
+- `audio-1980-walkman-v1.png`：1980年代携帯カセットプレーヤー(ウォークマン風)。同上。承認済み。
+- `audio-1980-minicompo-v1.png`：1980年代スタック型ミニコンポ(アンプ・イコライザー・ダブルカセット・ターンテーブル)。同上。承認済み。
+- `audio-1990-portable-cd-v1.png`：1990年代ポータブルCDプレーヤー。同上。承認済み。
+- `cook-1970-microwave-v1.png`：1970年代卓上電子レンジ(ベルタイマー式)。同上。承認済み。
+- `cook-1980-ricecooker-v1.png`：1980年代マイコン炊飯ジャー(花柄プリント)。同上。承認済み。
+- `clean-1970-vacuum-v1.png`：1970年代キャニスター型掃除機。同上。承認済み。
+- `air-1970-window-ac-v1.png`：1970年代窓用エアコン。同上。承認済み。
+- `clean-2010-robot-v1.png`：2010年代ロボット掃除機(充電ドック付き)。同上。承認済み。
+- `pc-1980-8bit-hobby-v1.png`：1980年代8ビットホビーパソコン(データレコーダー・CRT付属)。同上。承認済み。
+- `pc-1990-16bit-desktop-v1.png`：1990年代16ビットデスクトップPC(PC-98風、フロッピードライブ2基)。同上。承認済み。
+- `pc-1990-laptop-v1.png`：1990年代初期ノートパソコン(トラックボール内蔵)。同上。承認済み。
+- `mob-1990-cellular-v1.png`：1990年代初期携帯電話(ストレート型・伸縮アンテナ)。同上。承認済み(テンキー数字表示あり、要確認)。
+- `mob-2000-flip-phone-v1.png`：2000年代ガラケー(折りたたみ式・サブディスプレイ付き)。同上。承認済み。
+- `mob-2010-smartphone-v1.png`：2010年代スマートフォン(フルタッチスクリーン)。同上。承認済み。
+

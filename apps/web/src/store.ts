@@ -4,7 +4,7 @@ import { createGame } from '../../../packages/simulation/src/setup';
 import { advanceWeeks } from '../../../packages/simulation/src/week';
 import type { GameState } from '../../../packages/simulation/src/types';
 
-export type ScreenId = 'title' | 'office' | 'lab' | 'factory' | 'sales' | 'finance';
+export type ScreenId = 'title' | 'office' | 'meeting' | 'lab' | 'factory' | 'sales' | 'finance' | 'personnel' | 'archive';
 
 export type FundsPrompt = { required: number; cash: number; weeks: number };
 

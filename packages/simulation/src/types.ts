@@ -110,6 +110,68 @@ export type Product = {
   lastWeekShareBasis: number;
 };
 
+export type AdvertisingCampaignType = 'tv' | 'newspaper' | 'store';
+
+export type AdvertisingState = {
+  activeCampaign: AdvertisingCampaignType | null;
+  budget: Money;
+  boostWeeksRemaining: number;
+  boostBasis: number;
+};
+
+export type PersonnelState = {
+  morale: number; // 0〜100
+  wageLevel: number; // 1(抑制) 〜 3(標準) 〜 5(高待遇)
+  trainingCount: number;
+};
+
+export type ArchivedProduct = {
+  id: string;
+  name: string;
+  categoryId: CategoryId;
+  completedWeek: number;
+  releasedWeek: number;
+  retiredWeek: number | null;
+  performance: number;
+  unitCost: number;
+  price: number;
+  totalUnitsSold: number;
+  totalRevenue: Money;
+  totalProfit: Money;
+  peakShareBasis: number;
+  rank: 'S' | 'A' | 'B' | 'C' | 'D';
+  awards: string[];
+  review: string;
+};
+
+export type MeetingProposal = {
+  id: string;
+  executiveId: 'design' | 'sales' | 'finance' | 'production' | 'personnel';
+  title: string;
+  description: string;
+  cost: Money;
+  expectedEffect: string;
+  accepted: boolean;
+};
+
+export type RivalAction = {
+  id: string;
+  rivalId: string;
+  rivalName: string;
+  week: number;
+  actionText: string;
+  categoryId: CategoryId;
+};
+
+export type IndustryNewsEntry = {
+  id: string;
+  week: number;
+  title: string;
+  headline: string;
+  body: string;
+  impactText: string;
+};
+
 export type CompanyState = {
   name: string;
   accounts: Record<AccountId, Money>;
@@ -128,6 +190,12 @@ export type CompanyState = {
   /** 資金不足のまま進行した週数。 */
   graceWeeks: number;
   nextProductNumber: number;
+  advertising: AdvertisingState;
+  personnel: PersonnelState;
+  archive: ArchivedProduct[];
+  proposals: MeetingProposal[];
+  rivalActions: RivalAction[];
+  newsFeed: IndustryNewsEntry[];
 };
 
 export type RivalState = {

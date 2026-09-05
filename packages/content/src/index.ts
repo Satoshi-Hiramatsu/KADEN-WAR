@@ -5,3 +5,4 @@ export * from './channels';
 export * from './rivals';
 export * from './executives';
 export * from './scenarios';
+export * from './events';

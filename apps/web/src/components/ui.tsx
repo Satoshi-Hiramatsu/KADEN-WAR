@@ -1,36 +1,56 @@
 import type { ReactNode } from 'react';
-import rosterUrl from '../../../../assets/portraits/executives-roster-v1.png';
 import { findExecutive, type ExecutiveId } from '../../../../packages/content/src/executives';
 import type { DepartmentReport } from '../../../../packages/simulation/src/selectors';
+import type { GameState } from '../../../../packages/simulation/src/types';
+import {
+  getExecutivePortraitUrl,
+  getContextualPortrait,
+  getProductSpriteUrl,
+  getRivalPortraitUrl,
+  getNpcPortraitUrl,
+  getSceneBackgroundUrl,
+  type ExecutiveExpression,
+  type RivalSentiment,
+  type NpcId,
+  type SceneKey,
+} from '../assets';
 
-const portraitSize = 72;
-
-/**
- * 承認済みの顔一覧原画から1人分を切り出して表示する。
- * 個別スプライトはS9で制作するため、ここでは表示位置だけで切り出す。
- */
-export function Portrait({ executiveId }: { executiveId: ExecutiveId }) {
+export function Portrait({
+  executiveId,
+  expression = 'normal',
+  game,
+  size = 72,
+}: {
+  executiveId: ExecutiveId;
+  expression?: ExecutiveExpression;
+  game?: GameState;
+  size?: number;
+}) {
   const executive = findExecutive(executiveId);
+  const src = game
+    ? getContextualPortrait(executiveId, game)
+    : getExecutivePortraitUrl(executiveId, expression);
+
   return (
-    <span
-      className="portrait"
-      role="img"
-      aria-label={`${executive.role} ${executive.name}`}
-      style={{
-        width: portraitSize,
-        height: portraitSize,
-        backgroundImage: `url(${rosterUrl})`,
-        backgroundSize: `${portraitSize * 3}px ${portraitSize * 2}px`,
-        backgroundPosition: `-${executive.portrait.column * portraitSize}px -${executive.portrait.row * portraitSize}px`,
-      }}
+    <img
+      src={src}
+      alt={`${executive.role} ${executive.name}`}
+      className="portrait-img"
+      style={{ width: size, height: size, objectFit: 'cover' }}
     />
   );
 }
 
-export function ExecutiveHeader({ report }: { report: DepartmentReport }) {
+export function ExecutiveHeader({
+  report,
+  game,
+}: {
+  report: DepartmentReport;
+  game?: GameState;
+}) {
   return (
     <div className="executive">
-      <Portrait executiveId={report.executiveId} />
+      <Portrait executiveId={report.executiveId} game={game} />
       <div>
         <p className="executive-name">
           <span className="role">{report.role}</span> {report.name}
@@ -39,6 +59,93 @@ export function ExecutiveHeader({ report }: { report: DepartmentReport }) {
         {report.warnings.map(warning => (
           <p className="warning" key={warning}>！ {warning}</p>
         ))}
+      </div>
+    </div>
+  );
+}
+
+export function ProductSprite({
+  categoryId,
+  year = 1960,
+  size = 'md',
+  alt = '',
+}: {
+  categoryId: string;
+  year?: number;
+  size?: 'sm' | 'md' | 'lg' | 'hero';
+  alt?: string;
+}) {
+  const src = getProductSpriteUrl(categoryId, year);
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`product-sprite size-${size}`}
+      loading="lazy"
+    />
+  );
+}
+
+export function RivalPortrait({
+  rivalId,
+  sentiment = 'normal',
+  size = 56,
+}: {
+  rivalId: string;
+  sentiment?: RivalSentiment;
+  size?: number;
+}) {
+  const src = getRivalPortraitUrl(rivalId, sentiment);
+  return (
+    <img
+      src={src}
+      alt={rivalId}
+      className="rival-portrait-img"
+      style={{ width: size, height: size, objectFit: 'cover' }}
+      loading="lazy"
+    />
+  );
+}
+
+export function NpcPortrait({
+  npcId,
+  size = 56,
+}: {
+  npcId: NpcId;
+  size?: number;
+}) {
+  const src = getNpcPortraitUrl(npcId);
+  return (
+    <img
+      src={src}
+      alt={npcId}
+      className="npc-portrait-img"
+      style={{ width: size, height: size, objectFit: 'cover' }}
+      loading="lazy"
+    />
+  );
+}
+
+export function SceneBanner({
+  sceneKey,
+  game,
+  title,
+  eyebrow,
+  children,
+}: {
+  sceneKey: SceneKey;
+  game?: GameState;
+  title?: string;
+  eyebrow?: string;
+  children?: ReactNode;
+}) {
+  const bgUrl = getSceneBackgroundUrl(sceneKey, game);
+  return (
+    <div className="scene-banner" style={{ backgroundImage: `url(${bgUrl})` }}>
+      <div className="scene-overlay">
+        {eyebrow ? <p className="scene-eyebrow">{eyebrow}</p> : null}
+        {title ? <h2 className="scene-title">{title}</h2> : null}
+        {children}
       </div>
     </div>
   );

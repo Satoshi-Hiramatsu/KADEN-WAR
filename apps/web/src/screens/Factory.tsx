@@ -7,7 +7,7 @@ import {
 } from '../../../../packages/simulation/src/selectors';
 import { defectBasis, productionCapacityUnits } from '../../../../packages/simulation/src/week';
 import type { GameState } from '../../../../packages/simulation/src/types';
-import { ExecutiveHeader, MetricGrid, NumberField, Panel } from '../components/ui';
+import { ExecutiveHeader, MetricGrid, NumberField, Panel, SceneBanner, ProductSprite } from '../components/ui';
 import { useGameStore } from '../store';
 
 export function Factory({ game }: { game: GameState }) {
@@ -16,11 +16,12 @@ export function Factory({ game }: { game: GameState }) {
   const capacity = productionCapacityUnits(game);
   const planned = plannedProductionUnits(game);
   const products = game.company.products;
+  const currentYear = game.startYear + Math.floor(game.week / 48);
 
   return (
     <>
-      <Panel eyebrow="工場" title="生産と設備">
-        {report ? <ExecutiveHeader report={report} /> : null}
+      <SceneBanner sceneKey="factory" game={game} eyebrow="工場" title="生産ラインと製造設備">
+        {report ? <ExecutiveHeader report={report} game={game} /> : null}
         <MetricGrid
           metrics={[
             { label: '生産能力', value: `${capacity}台/週` },
@@ -29,7 +30,7 @@ export function Factory({ game }: { game: GameState }) {
             { label: '設備', value: formatMoney(game.company.accounts.equipment), note: '簿価' },
           ]}
         />
-      </Panel>
+      </SceneBanner>
 
       <Panel eyebrow="01 / 生産計画" title="週あたりの生産量">
         {products.length === 0 ? (
@@ -42,7 +43,12 @@ export function Factory({ game }: { game: GameState }) {
             <tbody>
               {products.map(product => (
                 <tr key={product.id}>
-                  <th scope="row">{product.name}</th>
+                  <th scope="row">
+                    <div className="product-cell">
+                      <ProductSprite categoryId={product.categoryId} year={currentYear} size="sm" />
+                      <span>{product.name}</span>
+                    </div>
+                  </th>
                   <td>{formatThousandYen(product.unitCost)}</td>
                   <td>{product.stockUnits}台</td>
                   <td>{averageUnitCost(product.stockUnits, product.stockValue)}</td>

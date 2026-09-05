@@ -9,22 +9,40 @@ import { Finance } from './screens/Finance';
 import { Lab } from './screens/Lab';
 import { Office } from './screens/Office';
 import { SalesOffice } from './screens/SalesOffice';
+import { Meeting } from './screens/Meeting';
+import { Personnel } from './screens/Personnel';
+import { Archive } from './screens/Archive';
 import { Title } from './screens/Title';
+import {
+  IconOffice,
+  IconMeeting,
+  IconLab,
+  IconFactory,
+  IconSales,
+  IconFinance,
+  IconPersonnel,
+  IconArchive,
+} from './components/icons';
 import { useGameStore, type ScreenId } from './store';
 import './style.css';
 
-const navigation: { id: ScreenId; label: string; role: string }[] = [
-  { id: 'office', label: '社長室', role: '経営者' },
-  { id: 'lab', label: '研究所', role: '設計統括' },
-  { id: 'factory', label: '工場', role: '生産統括' },
-  { id: 'sales', label: '販売本部', role: '販売統括' },
-  { id: 'finance', label: '経理部', role: '経理統括' },
+const navigation: { id: ScreenId; label: string; role: string; icon: typeof IconOffice }[] = [
+  { id: 'office', label: '社長室', role: '経営者', icon: IconOffice },
+  { id: 'meeting', label: '役員会議', role: '経営会議', icon: IconMeeting },
+  { id: 'lab', label: '研究所', role: '設計統括', icon: IconLab },
+  { id: 'factory', label: '工場', role: '生産統括', icon: IconFactory },
+  { id: 'sales', label: '販売本部', role: '販売統括', icon: IconSales },
+  { id: 'finance', label: '経理部', role: '経理統括', icon: IconFinance },
+  { id: 'personnel', label: '人事部', role: '人事統括', icon: IconPersonnel },
+  { id: 'archive', label: '名機図鑑', role: '社史殿堂', icon: IconArchive },
 ];
 
 function TopBar({ game }: { game: GameState }) {
   const advance = useGameStore(store => store.advance);
   const progress = scenarioProgress(game);
   const playing = game.status === 'playing';
+  const morale = Math.round(game.company.personnel?.morale ?? 75);
+
   return (
     <div className="topbar">
       <div>
@@ -34,13 +52,14 @@ function TopBar({ game }: { game: GameState }) {
       <dl className="topbar-metrics">
         <div><dt>現金</dt><dd>{formatMoney(game.company.accounts.cash)}</dd></div>
         <div><dt>ブランド</dt><dd>{formatBrand(game.company.brandBasis)}</dd></div>
+        <div><dt>社員士気</dt><dd>{morale}点</dd></div>
         <div><dt>累計売上</dt><dd>{formatMoney(game.totals.revenue)}</dd></div>
         <div><dt>累計利益</dt><dd>{formatMoney(game.totals.profit)}</dd></div>
         <div><dt>残り</dt><dd>{progress.weeksRemaining}週</dd></div>
       </dl>
       <div className="actions">
         <button disabled={!playing} onClick={() => advance(1)}>1週進める</button>
-        <button disabled={!playing} onClick={() => advance(4)}>1か月進める</button>
+        <button disabled={!playing} onClick={() => advance(4)}>1か月進める（月次実行）</button>
       </div>
     </div>
   );
@@ -93,7 +112,7 @@ function Result({ game }: { game: GameState }) {
   return (
     <section className={game.status === 'won' ? 'result won' : 'result lost'}>
       <p className="eyebrow">結果</p>
-      <h2>{game.status === 'won' ? '目標を達成しました' : '目標を達成できませんでした'}</h2>
+      <h2>{game.status === 'won' ? '目標を達成しました！' : '目標を達成できませんでした'}</h2>
       <p>{game.outcome}</p>
       <ul className="goals">
         {goals.map(goal => (
@@ -122,34 +141,43 @@ function App() {
   return (
     <main>
       <header>
-        <span>KADEN WAR</span>
-        <p>ローカルデモ / S1〜S3</p>
+        <span>KADEN WAR — 家電戦争</span>
+        <p>経営指令本部</p>
       </header>
       <TopBar game={game} />
       <nav aria-label="担当">
-        {navigation.map(item => (
-          <button
-            key={item.id}
-            className={screen === item.id ? 'nav active' : 'nav'}
-            aria-current={screen === item.id ? 'page' : undefined}
-            onClick={() => setScreen(item.id)}
-          >
-            {item.label}
-            <small>{item.role}</small>
-          </button>
-        ))}
+        {navigation.map(item => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              className={screen === item.id ? 'nav active' : 'nav'}
+              aria-current={screen === item.id ? 'page' : undefined}
+              onClick={() => setScreen(item.id)}
+            >
+              <span className="nav-title-line">
+                <Icon size={16} />
+                <span>{item.label}</span>
+              </span>
+              <small>{item.role}</small>
+            </button>
+          );
+        })}
         <button className="nav quit" onClick={quit}>やめる</button>
       </nav>
       <Notice />
       <FundsDialog game={game} />
       {game.status !== 'playing' ? <Result game={game} /> : null}
       {screen === 'office' ? <Office game={game} /> : null}
+      {screen === 'meeting' ? <Meeting game={game} /> : null}
       {screen === 'lab' ? <Lab game={game} /> : null}
       {screen === 'factory' ? <Factory game={game} /> : null}
       {screen === 'sales' ? <SalesOffice game={game} /> : null}
       {screen === 'finance' ? <Finance game={game} /> : null}
+      {screen === 'personnel' ? <Personnel game={game} /> : null}
+      {screen === 'archive' ? <Archive game={game} /> : null}
       <footer>
-        週送りで研究・開発・生産・販売・決算が進みます。保存は未実装で、再読み込みすると最初からになります。
+        月初の役員会議で方針を決定し、週送り・月送りで研究・開発・生産・販売・決算を進めます。
       </footer>
     </main>
   );

@@ -3,6 +3,7 @@ import { rivals } from '../../content/src/rivals';
 import { findScenario, type ScenarioDefinition } from '../../content/src/scenarios';
 import { createAccounts, emptyPeriodTotals, post } from './ledger';
 import { seedRng } from './rng';
+import { refreshMeetingProposals } from './week';
 import type { GameState } from './types';
 
 export const engineVersion = '0.3.0';
@@ -47,6 +48,21 @@ export function createGame(options: NewGameOptions): GameState {
       channels: { ...scenario.initialChannels },
       graceWeeks: 0,
       nextProductNumber: 1,
+      advertising: {
+        activeCampaign: null,
+        budget: 0,
+        boostWeeksRemaining: 0,
+        boostBasis: 0,
+      },
+      personnel: {
+        morale: 75,
+        wageLevel: 3,
+        trainingCount: 0,
+      },
+      archive: [],
+      proposals: [],
+      rivalActions: [],
+      newsFeed: [],
     },
     rivals: rivals.map(rival => ({ id: rival.id, name: rival.name, lastWeekShareBasis: 0 })),
     monthTotals: emptyPeriodTotals(0),
@@ -75,6 +91,7 @@ export function createGame(options: NewGameOptions): GameState {
 
   state.monthTotals = emptyPeriodTotals(state.company.accounts.cash);
   state.yearTotals = emptyPeriodTotals(state.company.accounts.cash);
+  refreshMeetingProposals(state);
   state.logSeq += 1;
   state.log.push({
     week: 0,

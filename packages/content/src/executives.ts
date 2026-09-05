@@ -18,7 +18,7 @@ export const executives: readonly ExecutiveDefinition[] = [
   { id: 'sales', role: '販売統括', name: '鳴海 達也', screenId: 'sales', portrait: { column: 2, row: 0 }, focus: '価格・販路・販売実績' },
   { id: 'finance', role: '経理統括', name: '水野 智子', screenId: 'finance', portrait: { column: 0, row: 1 }, focus: '損益・資金繰り・借入' },
   { id: 'production', role: '生産統括', name: '岩瀬 修', screenId: 'factory', portrait: { column: 1, row: 1 }, focus: '生産量・設備・在庫' },
-  { id: 'personnel', role: '人事統括', name: '春野 佳代', screenId: 'office', portrait: { column: 2, row: 1 }, focus: '人員と人件費の報告' },
+  { id: 'personnel', role: '人事統括', name: '春野 佳代', screenId: 'personnel', portrait: { column: 2, row: 1 }, focus: '人員配置・士気・教育・給与' },
 ];
 
 export function findExecutive(id: ExecutiveId): ExecutiveDefinition {

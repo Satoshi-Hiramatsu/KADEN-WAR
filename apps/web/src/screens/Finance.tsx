@@ -3,7 +3,7 @@ import { loanLimit } from '../../../../packages/simulation/src/commands';
 import { formatMoney } from '../../../../packages/simulation/src/money';
 import { departmentReports, financeView } from '../../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../../packages/simulation/src/types';
-import { ExecutiveHeader, MetricGrid, NumberField, Panel } from '../components/ui';
+import { ExecutiveHeader, MetricGrid, NumberField, Panel, SceneBanner, NpcPortrait } from '../components/ui';
 import { useGameStore } from '../store';
 
 export function Finance({ game }: { game: GameState }) {
@@ -28,9 +28,9 @@ export function Finance({ game }: { game: GameState }) {
 
   return (
     <>
-      <Panel eyebrow="経理部" title="損益・資金繰り">
-        {report ? <ExecutiveHeader report={report} /> : null}
-      </Panel>
+      <SceneBanner sceneKey="finance" game={game} eyebrow="経理部" title="財務・損益・資金管理">
+        {report ? <ExecutiveHeader report={report} game={game} /> : null}
+      </SceneBanner>
 
       <Panel eyebrow="01 / 損益計算書" title="今月と今年度">
         <table>
@@ -85,6 +85,15 @@ export function Finance({ game }: { game: GameState }) {
       </Panel>
 
       <Panel eyebrow="04 / 資金調達" title="借入と返済">
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 12, background: '#f5f1e5', padding: '10px 14px', borderLeft: '4px solid #758171' }}>
+          <NpcPortrait npcId="banker" size={56} />
+          <div>
+            <strong style={{ fontSize: '.9rem' }}>メインバンク融資担当</strong>
+            <p style={{ margin: '2px 0 0', fontSize: '.84rem', color: '#4a5148' }}>
+              「御社の製品展開と財務規律を注視しております。設備投資や運転資金のご用立ては、枠内の範囲で迅速に応じさせていただきます。」
+            </p>
+          </div>
+        </div>
         <p>借入枠は資本金の2倍まで。利息は年7.0%で、週ごとに支払います。</p>
         <MetricGrid
           metrics={[

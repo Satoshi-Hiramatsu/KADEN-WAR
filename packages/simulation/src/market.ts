@@ -105,8 +105,11 @@ export function evaluateMarket(state: GameState, options: { withNoise: boolean }
       const priceRatio = category.referencePrice / product.price;
       const perfFactor = product.performance / category.basePerformance;
       const fresh = freshnessBasis(product, state.week) / 10000;
+      const adBoost = state.company.advertising.boostWeeksRemaining > 0
+        ? (10000 + state.company.advertising.boostBasis) / 10000
+        : 1.0;
       let attractiveness = perfFactor * priceRatio * priceRatio
-        * brandFactor(state.company.brandBasis) * reach * fresh;
+        * brandFactor(state.company.brandBasis) * reach * fresh * adBoost;
       if (options.withNoise) {
         const drawn = nextInt(rng, 9700, 10300);
         rng = drawn.state;

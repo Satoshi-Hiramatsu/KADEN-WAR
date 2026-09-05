@@ -18,7 +18,14 @@ export type Command =
   | { type: 'closeChannel'; channelId: ChannelId }
   | { type: 'investEquipment'; units: number }
   | { type: 'borrow'; amount: Money }
-  | { type: 'repay'; amount: Money };
+  | { type: 'repay'; amount: Money }
+  | { type: 'setAdvertising'; campaign: 'tv' | 'newspaper' | 'store'; budget: Money }
+  | { type: 'setWageLevel'; level: number }
+  | { type: 'conductTraining'; cost: Money }
+  | { type: 'payBonus'; amountPerEmployee: Money }
+  | { type: 'acceptProposal'; proposalId: string }
+  | { type: 'retireProduct'; productId: string }
+  | { type: 'minorChangeProduct'; productId: string };
 
 export function loanLimit(state: GameState): Money {
   const capital = state.company.accounts.capital;
@@ -183,6 +190,101 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       if (command.amount > company.accounts.debt) return fail(state, '借入残高を超える返済はできません。');
       if (command.amount > company.accounts.cash) return fail(state, '返済に必要な現金がありません。');
       post(draft, { debit: 'debt', credit: 'cash', amount: command.amount, reason: '借入返済', flow: 'financing' });
+      break;
+    }
+    case 'setAdvertising': {
+      if (command.budget < 50) return fail(state, '広告予算は50万円以上で指定してください。');
+      if (company.accounts.cash < command.budget) return fail(state, `広告費${command.budget}万円を支払う現金がありません。`);
+      payCash(draft, { debit: 'sellingExpense', amount: command.budget, reason: `広告宣伝（${command.campaign.toUpperCase()}）`, flow: 'operating' });
+      const boostBasis = command.campaign === 'tv' ? 3500 : command.campaign === 'newspaper' ? 2000 : 1200;
+      company.advertising = {
+        activeCampaign: command.campaign,
+        budget: command.budget,
+        boostWeeksRemaining: 4,
+        boostBasis,
+      };
+      company.brandBasis = Math.min(10000, company.brandBasis + Math.floor(command.budget / 4));
+      break;
+    }
+    case 'setWageLevel': {
+      if (command.level < 1 || command.level > 5) return fail(state, '給与水準は1〜5の間で指定してください。');
+      company.personnel.wageLevel = Math.trunc(command.level);
+      break;
+    }
+    case 'conductTraining': {
+      const cost = Math.max(30, command.cost);
+      if (company.accounts.cash < cost) return fail(state, `研修費用${cost}万円を支払う現金がありません。`);
+      payCash(draft, { debit: 'laborExpense', amount: cost, reason: '社員教育・品質改善研修', flow: 'operating' });
+      company.personnel.morale = Math.min(100, company.personnel.morale + 10);
+      company.personnel.trainingCount += 1;
+      break;
+    }
+    case 'payBonus': {
+      const total = command.amountPerEmployee * company.employees;
+      if (company.accounts.cash < total) return fail(state, `賞与総額${total}万円を支払う現金がありません。`);
+      payCash(draft, { debit: 'laborExpense', amount: total, reason: '決算特別賞与の支給', flow: 'operating' });
+      company.personnel.morale = Math.min(100, company.personnel.morale + 20);
+      break;
+    }
+    case 'acceptProposal': {
+      const proposal = company.proposals.find(p => p.id === command.proposalId);
+      if (!proposal) return fail(state, '役員提案が見つかりません。');
+      if (proposal.cost > 0) {
+        if (company.accounts.cash < proposal.cost) return fail(state, `提案の実行資金${proposal.cost}万円が足りません。`);
+        payCash(draft, { debit: 'sellingExpense', amount: proposal.cost, reason: `役員提案の実行：${proposal.title}`, flow: 'operating' });
+      }
+      proposal.accepted = true;
+      company.personnel.morale = Math.min(100, company.personnel.morale + 5);
+      break;
+    }
+    case 'retireProduct': {
+      const index = company.products.findIndex(p => p.id === command.productId);
+      if (index < 0) return fail(state, '製品が見つかりません。');
+      const product = company.products[index]!;
+      product.onSale = false;
+      const rank = product.totalUnitsSold >= 2000 ? 'S' : product.totalUnitsSold >= 1000 ? 'A' : product.totalUnitsSold >= 500 ? 'B' : 'C';
+      const awards: string[] = [];
+      if (product.totalUnitsSold >= 1000) awards.push('年間ベストセラー');
+      if (product.performance >= 110) awards.push('通産省グッドデザイン選定');
+      const archived = company.archive.find(a => a.id === product.id);
+      if (archived) {
+        archived.retiredWeek = draft.week;
+        archived.totalUnitsSold = product.totalUnitsSold;
+        archived.totalRevenue = product.totalRevenue;
+        archived.totalProfit = Math.floor(product.totalRevenue * 0.22);
+        archived.rank = rank;
+        archived.awards = awards;
+      } else {
+        company.archive.push({
+          id: product.id,
+          name: product.name,
+          categoryId: product.categoryId,
+          completedWeek: product.completedWeek,
+          releasedWeek: product.releasedWeek ?? draft.week,
+          retiredWeek: draft.week,
+          performance: product.performance,
+          unitCost: product.unitCost,
+          price: product.price,
+          totalUnitsSold: product.totalUnitsSold,
+          totalRevenue: product.totalRevenue,
+          totalProfit: Math.floor(product.totalRevenue * 0.22),
+          peakShareBasis: product.lastWeekShareBasis,
+          rank,
+          awards,
+          review: `市場を彩った${product.name}。生涯販売数${product.totalUnitsSold}台を記録して殿堂入り。`,
+        });
+      }
+      company.products.splice(index, 1);
+      break;
+    }
+    case 'minorChangeProduct': {
+      const product = company.products.find(p => p.id === command.productId);
+      if (!product) return fail(state, '製品が見つかりません。');
+      const cost = 50;
+      if (company.accounts.cash < cost) return fail(state, `改良費用${cost}万円を支払う現金がありません。`);
+      payCash(draft, { debit: 'developmentExpense', amount: cost, reason: `${product.name}のマイナーチェンジ`, flow: 'operating' });
+      product.releasedWeek = draft.week;
+      product.performance += 2;
       break;
     }
   }

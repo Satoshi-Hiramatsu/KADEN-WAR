@@ -1,7 +1,8 @@
 import { findCategory } from '../../content/src/categories';
 import { findScenario } from '../../content/src/scenarios';
 import { calendarRules, economyRules, weeksPerYear } from '../../content/src/rules';
-import { findResearchTheme, productionBonus, techName } from '../../content/src/technology';
+import { findHistoricalEvent } from '../../content/src/events';
+import { findResearchTheme, productionBonus, techName, researchThemes } from '../../content/src/technology';
 import { calendarLabel } from './calendar';
 import {
   closeIncomeToRetainedEarnings,
@@ -22,6 +23,7 @@ import type {
   AdvanceResult,
   CategoryId,
   GameState,
+  MeetingProposal,
   Money,
   PeriodSummary,
   Product,
@@ -39,7 +41,8 @@ export function addLog(state: GameState, kind: 'info' | 'good' | 'warn' | 'bad',
 }
 
 export function weeklyLaborCost(state: GameState): Money {
-  return amountFromUnits(state.company.employees, economyRules.weeklyWagePerEmployee);
+  const wageMultiplier = [0.8, 0.9, 1.0, 1.15, 1.3][(state.company.personnel?.wageLevel ?? 3) - 1] ?? 1.0;
+  return Math.floor(amountFromUnits(state.company.employees, economyRules.weeklyWagePerEmployee) * wageMultiplier);
 }
 
 export function weeklyInterestCost(state: GameState): Money {
@@ -68,7 +71,11 @@ export function productionCapacityUnits(state: GameState): number {
 }
 
 export function defectBasis(state: GameState): number {
-  return Math.max(0, economyRules.defectBaseBasis - productionBonus(state.company.ownedTechIds).defectReductionBasis);
+  const base = Math.max(0, economyRules.defectBaseBasis - productionBonus(state.company.ownedTechIds).defectReductionBasis);
+  const morale = state.company.personnel?.morale ?? 75;
+  const trainingReduction = Math.min(300, (state.company.personnel?.trainingCount ?? 0) * 50);
+  const moraleFactor = morale >= 80 ? 0.75 : morale >= 60 ? 1.0 : morale >= 40 ? 1.4 : 2.0;
+  return Math.max(0, Math.floor((base - trainingReduction) * moraleFactor));
 }
 
 /** 収益と費用の累計。週次の損益を差分で求めるために使う。 */
@@ -343,6 +350,208 @@ function evaluateScenario(state: GameState): void {
   }
 }
 
+export function refreshMeetingProposals(state: GameState): void {
+  const company = state.company;
+  const proposals: MeetingProposal[] = [];
+
+  // 1. 設計統括
+  const unresearched = researchThemes.find(t => !company.ownedTechIds.includes(t.grantsTechId));
+  if (unresearched) {
+    proposals.push({
+      id: `prop-design-${state.week}`,
+      executiveId: 'design',
+      title: `「${unresearched.name}」の研究着手`,
+      description: `次代の競争力確保のため、${unresearched.name}への集中投資を具申します。`,
+      cost: 0,
+      expectedEffect: unresearched.effect,
+      accepted: false,
+    });
+  }
+
+  // 2. 販売統括
+  if (company.advertising.boostWeeksRemaining <= 0) {
+    proposals.push({
+      id: `prop-sales-${state.week}`,
+      executiveId: 'sales',
+      title: 'テレビCM放映キャンペーンの実施',
+      description: 'お茶の間の認知度を一気に高め、ライバルからシェアを奪取する全国CMを打ちましょう！',
+      cost: 150,
+      expectedEffect: '4週間にわたり全製品の市場需要+35%、ブランド向上',
+      accepted: false,
+    });
+  } else {
+    proposals.push({
+      id: `prop-sales-${state.week}`,
+      executiveId: 'sales',
+      title: '系列販売店の新規開拓',
+      description: '地域に根ざした系列店との契約を増やし、安定した販売基盤を固めるべきです。',
+      cost: 80,
+      expectedEffect: '販売能力+18台/週、販路維持',
+      accepted: false,
+    });
+  }
+
+  // 3. 生産統括
+  if (company.purchasedEquipmentUnits < 5) {
+    proposals.push({
+      id: `prop-prod-${state.week}`,
+      executiveId: 'production',
+      title: '最新鋭工作機械の導入（設備増設）',
+      description: '工場のラインを増強し、週あたり生産能力を拡大して品切れを防ぎます。',
+      cost: 300,
+      expectedEffect: '週の生産能力+25台（設備1口増設）',
+      accepted: false,
+    });
+  } else {
+    proposals.push({
+      id: `prop-prod-${state.week}`,
+      executiveId: 'production',
+      title: '徹底的な歩留まり改善・工場５Ｓ運動',
+      description: '治具の点検と作業標準化により、不良率を極限まで低減させます。',
+      cost: 40,
+      expectedEffect: '不良率低減、製造原価の安定',
+      accepted: false,
+    });
+  }
+
+  // 4. 経理統括
+  if (company.accounts.cash < 500 && company.accounts.debt < 2000) {
+    proposals.push({
+      id: `prop-fin-${state.week}`,
+      executiveId: 'finance',
+      title: 'メインバンクからの長期運転資金借入',
+      description: '黒字倒産を防ぎ手元流動性を確保するため、低利での追加借入を強く進言します。',
+      cost: 0,
+      expectedEffect: '手元現金確保、資金ショート防止',
+      accepted: false,
+    });
+  } else {
+    proposals.push({
+      id: `prop-fin-${state.week}`,
+      executiveId: 'finance',
+      title: '特別決算賞与の支給による士気向上',
+      description: '利益を現場に還元し、全社の一体感とモチベーションを高めましょう。',
+      cost: 80,
+      expectedEffect: '社員士気（モラル）大幅向上',
+      accepted: false,
+    });
+  }
+
+  // 5. 人事統括
+  proposals.push({
+    id: `prop-pers-${state.week}`,
+    executiveId: 'personnel',
+    title: '全社品質管理研修（QCサークル）の実施',
+    description: '現場の教育を強化し、社員の団結力と品質意識を底上げします。',
+    cost: 50,
+    expectedEffect: '社員士気+10、不良率低減、開発効率向上',
+    accepted: false,
+  });
+
+  company.proposals = proposals;
+}
+
+export function simulateRivalActions(state: GameState): void {
+  const week = state.week;
+  if (week % 4 !== 0 || week === 0) return;
+  const rivalIndex = Math.floor(week / 4) % 3;
+  const candidates: { id: string; name: string; action: string; cat: CategoryId }[] = [
+    {
+      id: 'rival-kowa',
+      name: '光和電機',
+      action: '大迫社長の号令により、主力製品の大幅な値下げ攻勢を宣言！価格競争が激化しています。',
+      cat: 'refrigerator',
+    },
+    {
+      id: 'rival-hinode',
+      name: '日之出工業',
+      action: '神崎社長が記者会見を開き、独自開発の新技術を投入した高級フラッグシップ機を発表！',
+      cat: 'television',
+    },
+    {
+      id: 'rival-mine',
+      name: '三嶺電器',
+      action: '島村社長が全国特約店との結束を強化し、地域密着の販促キャンペーンを展開。',
+      cat: 'washer',
+    },
+  ];
+  const chosen = candidates[rivalIndex]!;
+  state.company.rivalActions.unshift({
+    id: `rival-act-${state.week}`,
+    rivalId: chosen.id,
+    rivalName: chosen.name,
+    week: state.week,
+    actionText: chosen.action,
+    categoryId: chosen.cat,
+  });
+  if (state.company.rivalActions.length > 20) state.company.rivalActions.pop();
+  addLog(state, 'warn', `【競合動向】${chosen.name}：${chosen.action}`);
+}
+
+export function checkHistoricalEvents(state: GameState): void {
+  const year = state.startYear + Math.floor(state.week / weeksPerYear);
+  const month = 1 + Math.floor((state.week % weeksPerYear) / calendarRules.weeksPerMonth);
+  const event = findHistoricalEvent(year, month);
+  if (event && !state.company.newsFeed.some(n => n.id === event.id)) {
+    state.company.newsFeed.unshift({
+      id: event.id,
+      week: state.week,
+      title: event.title,
+      headline: event.headline,
+      body: event.description,
+      impactText: event.impactType === 'boom' ? '需要急拡大！' : event.impactType === 'cost_hike' ? '原価上昇圧力' : '景気後退',
+    });
+    addLog(state, event.impactType === 'boom' ? 'good' : 'bad', `【業界速報】${event.title}：${event.headline}`);
+  }
+}
+
+function updateArchiveAndMorale(state: GameState, netIncome: Money): void {
+  const company = state.company;
+  if (company.advertising.boostWeeksRemaining > 0) {
+    company.advertising.boostWeeksRemaining -= 1;
+  }
+  const wageDelta = ((company.personnel?.wageLevel ?? 3) - 3) * 0.4;
+  const incomeDelta = netIncome > 0 ? 0.3 : -0.4;
+  const currentMorale = company.personnel?.morale ?? 75;
+  company.personnel.morale = Math.max(10, Math.min(100, Math.round((currentMorale + wageDelta + incomeDelta) * 10) / 10));
+
+  for (const product of company.products) {
+    let archived = company.archive.find(a => a.id === product.id);
+    if (!archived && product.releasedWeek !== null) {
+      archived = {
+        id: product.id,
+        name: product.name,
+        categoryId: product.categoryId,
+        completedWeek: product.completedWeek,
+        releasedWeek: product.releasedWeek,
+        retiredWeek: null,
+        performance: product.performance,
+        unitCost: product.unitCost,
+        price: product.price,
+        totalUnitsSold: 0,
+        totalRevenue: 0,
+        totalProfit: 0,
+        peakShareBasis: 0,
+        rank: 'C',
+        awards: [],
+        review: `市場を駆け抜ける期待の新鋭機。`,
+      };
+      company.archive.push(archived);
+    }
+    if (archived) {
+      archived.totalUnitsSold = product.totalUnitsSold;
+      archived.totalRevenue = product.totalRevenue;
+      archived.totalProfit = Math.floor(product.totalRevenue * 0.22);
+      if (product.lastWeekShareBasis > archived.peakShareBasis) {
+        archived.peakShareBasis = product.lastWeekShareBasis;
+      }
+      if (archived.totalUnitsSold >= 2000) archived.rank = 'S';
+      else if (archived.totalUnitsSold >= 1000) archived.rank = 'A';
+      else if (archived.totalUnitsSold >= 500) archived.rank = 'B';
+    }
+  }
+}
+
 /** 1週進める。必須支払いに現金が足りない場合は状態を変えずに中断する。 */
 export function advanceWeek(state: GameState, options: { allowShortfall?: boolean } = {}): AdvanceResult {
   if (state.status !== 'playing') {
@@ -386,6 +595,7 @@ export function advanceWeek(state: GameState, options: { allowShortfall?: boolea
     categoryShares: sales.categoryShares,
   };
   draft.lastWeek = weekReport;
+  updateArchiveAndMorale(draft, weekRevenue - weekExpenses);
 
   if (draft.company.accounts.payable > 0) {
     draft.company.graceWeeks += 1;
@@ -404,6 +614,9 @@ export function advanceWeek(state: GameState, options: { allowShortfall?: boolea
     draft.totals.profit += summary.netIncome;
     draft.monthTotals = emptyPeriodTotals(draft.company.accounts.cash);
     draft.monthStartWeek = draft.week;
+    refreshMeetingProposals(draft);
+    simulateRivalActions(draft);
+    checkHistoricalEvents(draft);
     addLog(draft, summary.netIncome >= 0 ? 'info' : 'warn',
       `月次決算：${summary.label} 売上${summary.totals.revenue}万円、純損益${summary.netIncome}万円。`);
   }

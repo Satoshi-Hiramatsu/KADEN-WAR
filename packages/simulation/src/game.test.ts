@@ -243,3 +243,61 @@ describe('資金不足と借入', () => {
     expect(state.outcome).toContain('資金不足');
   });
 });
+
+describe('本格経営機能（広告・人事・会議・アーカイブ）', () => {
+  it('テレビCMを打つと広告ブーストが4週間有効になり、ブランドが向上する', () => {
+    let state = newGame();
+    const initialBrand = state.company.brandBasis;
+    state = must(applyCommand(state, { type: 'setAdvertising', campaign: 'tv', budget: 150 }));
+    expect(state.company.advertising.activeCampaign).toBe('tv');
+    expect(state.company.advertising.boostWeeksRemaining).toBe(4);
+    expect(state.company.advertising.boostBasis).toBe(3500);
+    expect(state.company.brandBasis).toBeGreaterThan(initialBrand);
+
+    state = advance(state, 1);
+    expect(state.company.advertising.boostWeeksRemaining).toBe(3);
+  });
+
+  it('人事研修と賞与で士気が向上し、不良率の低減に寄与する', () => {
+    let state = newGame();
+    expect(state.company.personnel.morale).toBe(75);
+
+    state = must(applyCommand(state, { type: 'conductTraining', cost: 50 }));
+    expect(state.company.personnel.morale).toBe(85);
+    expect(state.company.personnel.trainingCount).toBe(1);
+
+    state = must(applyCommand(state, { type: 'payBonus', amountPerEmployee: 5 }));
+    expect(state.company.personnel.morale).toBe(100);
+  });
+
+  it('役員会議の提案を採択できる', () => {
+    const state = newGame();
+    expect(state.company.proposals.length).toBeGreaterThan(0);
+    const proposal = state.company.proposals[0]!;
+    const accepted = must(applyCommand(state, { type: 'acceptProposal', proposalId: proposal.id }));
+    const found = accepted.company.proposals.find(p => p.id === proposal.id);
+    expect(found?.accepted).toBe(true);
+  });
+
+  it('製品を引退させると歴代名機図鑑に登録され、現役一覧から除外される', () => {
+    let state = releaseFirstProduct(newGame());
+    state = advance(state, 4);
+    const product = state.company.products[0]!;
+    state = must(applyCommand(state, { type: 'retireProduct', productId: product.id }));
+    expect(state.company.products.length).toBe(0);
+    expect(state.company.archive.length).toBe(1);
+    expect(state.company.archive[0]?.name).toBe(product.name);
+    expect(state.company.archive[0]?.retiredWeek).toBeDefined();
+  });
+
+  it('マイナーチェンジで製品の鮮度が全回復する', () => {
+    let state = releaseFirstProduct(newGame());
+    state = advance(state, 8);
+    const product = state.company.products[0]!;
+    const initialPerf = product.performance;
+    state = must(applyCommand(state, { type: 'minorChangeProduct', productId: product.id }));
+    const updated = state.company.products[0]!;
+    expect(updated.releasedWeek).toBe(state.week);
+    expect(updated.performance).toBeGreaterThan(initialPerf);
+  });
+});

@@ -12,13 +12,14 @@ import { defaultModuleIds, evaluateDesign, maxQualityLevel } from '../../../../p
 import { formatMoney, formatThousandYen } from '../../../../packages/simulation/src/money';
 import { departmentReports } from '../../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../../packages/simulation/src/types';
-import { ExecutiveHeader, MetricGrid, NumberField, Panel } from '../components/ui';
+import { ExecutiveHeader, MetricGrid, NumberField, Panel, SceneBanner, ProductSprite } from '../components/ui';
 import { useGameStore } from '../store';
 
 export function Lab({ game }: { game: GameState }) {
   const dispatch = useGameStore(store => store.dispatch);
   const report = departmentReports(game).find(entry => entry.executiveId === 'design');
   const owned = game.company.ownedTechIds;
+  const currentYear = game.startYear + Math.floor(game.week / 48);
 
   const [categoryId, setCategoryId] = useState<CategoryId>('refrigerator');
   const [moduleIds, setModuleIds] = useState<string[]>(() => defaultModuleIds('refrigerator'));
@@ -33,6 +34,9 @@ export function Lab({ game }: { game: GameState }) {
   function changeCategory(next: CategoryId) {
     setCategoryId(next);
     setModuleIds(defaultModuleIds(next));
+    if (next === 'refrigerator') setName('あかつき冷蔵庫1号');
+    else if (next === 'washer') setName('あかつき噴流洗濯機1号');
+    else if (next === 'television') setName('あかつきテレビ1号');
   }
 
   function changeModule(slotIndex: number, moduleId: string) {
@@ -41,12 +45,13 @@ export function Lab({ game }: { game: GameState }) {
 
   const research = game.company.research;
   const activeTheme = researchThemes.find(theme => theme.id === research.themeId);
+  const releasedProducts = game.company.products.filter(p => p.releasedWeek !== null);
 
   return (
     <>
-      <Panel eyebrow="研究所" title="研究と製品設計">
-        {report ? <ExecutiveHeader report={report} /> : null}
-      </Panel>
+      <SceneBanner sceneKey="lab" game={game} eyebrow="研究所" title="研究開発と製品設計">
+        {report ? <ExecutiveHeader report={report} game={game} /> : null}
+      </SceneBanner>
 
       <Panel eyebrow="01 / 研究" title="研究課題">
         <p>研究予算は週ごとに現金から支払い、そのまま研究ポイントになります。完了すると新しい部品や生産技術が使えます。</p>
@@ -102,45 +107,52 @@ export function Lab({ game }: { game: GameState }) {
       </Panel>
 
       <Panel eyebrow="02 / 設計" title="新製品の設計">
-        <div className="design-form">
-          <label className="field">
-            <span>製品分類</span>
-            <select value={categoryId} onChange={event => changeCategory(event.target.value as CategoryId)}>
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
-            </select>
-          </label>
-          {moduleSlots.map((slot, index) => (
-            <label className="field" key={slot.id}>
-              <span>{slot.name}</span>
-              <select
-                value={moduleIds[index] ?? ''}
-                onChange={event => changeModule(index, event.target.value)}
-              >
-                {modulesFor(categoryId, slot.id).map(module => {
-                  const locked = module.requiredTechId !== null && !owned.includes(module.requiredTechId);
-                  return (
-                    <option key={module.id} value={module.id} disabled={locked}>
-                      {module.name}{locked ? '（未解禁）' : ''}
-                    </option>
-                  );
-                })}
+        <div className="design-preview-container">
+          <div className="product-pedestal">
+            <ProductSprite categoryId={categoryId} year={currentYear} size="hero" alt={name} />
+            <small style={{ fontWeight: 'bold', marginTop: 6 }}>{name}</small>
+          </div>
+
+          <div className="design-form">
+            <label className="field">
+              <span>製品分類</span>
+              <select value={categoryId} onChange={event => changeCategory(event.target.value as CategoryId)}>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
               </select>
             </label>
-          ))}
-          <label className="field">
-            <span>品質投資</span>
-            <select value={quality} onChange={event => setQuality(Number(event.target.value))}>
-              {Array.from({ length: maxQualityLevel + 1 }, (_, level) => (
-                <option key={level} value={level}>段階{level}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>製品名</span>
-            <input type="text" value={name} maxLength={24} onChange={event => setName(event.target.value)} />
-          </label>
+            {moduleSlots.map((slot, index) => (
+              <label className="field" key={slot.id}>
+                <span>{slot.name}</span>
+                <select
+                  value={moduleIds[index] ?? ''}
+                  onChange={event => changeModule(index, event.target.value)}
+                >
+                  {modulesFor(categoryId, slot.id).map(module => {
+                    const locked = module.requiredTechId !== null && !owned.includes(module.requiredTechId);
+                    return (
+                      <option key={module.id} value={module.id} disabled={locked}>
+                        {module.name}{locked ? '（未解禁）' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+            ))}
+            <label className="field">
+              <span>品質投資</span>
+              <select value={quality} onChange={event => setQuality(Number(event.target.value))}>
+                {Array.from({ length: maxQualityLevel + 1 }, (_, level) => (
+                  <option key={level} value={level}>段階{level}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>製品名</span>
+              <input type="text" value={name} maxLength={24} onChange={event => setName(event.target.value)} />
+            </label>
+          </div>
         </div>
 
         <p className="module-note">
@@ -178,7 +190,12 @@ export function Lab({ game }: { game: GameState }) {
             <tbody>
               {game.company.projects.map(project => (
                 <tr key={project.id}>
-                  <th scope="row">{project.name}</th>
+                  <th scope="row">
+                    <div className="product-cell">
+                      <ProductSprite categoryId={project.categoryId} year={currentYear} size="sm" />
+                      <span>{project.name}</span>
+                    </div>
+                  </th>
                   <td>{project.remainingWeeks}週</td>
                   <td>{formatMoney(project.paidCost)} / {formatMoney(project.devCost)}</td>
                   <td>{formatThousandYen(project.unitCost)}</td>
@@ -194,6 +211,44 @@ export function Lab({ game }: { game: GameState }) {
         )}
         <small>中止しても支払済みの開発費は戻りません。</small>
       </Panel>
+
+      {releasedProducts.length > 0 ? (
+        <Panel eyebrow="04 / 改良" title="マイナーチェンジ（鮮度回復）">
+          <p>発売から時間が経過して市場での鮮度が低下した製品に改良を加えます。50万円の費用で鮮度が全回復し、性能がわずかに向上します。</p>
+          <table>
+            <thead>
+              <tr><th>製品</th><th>発売週</th><th>経過週数</th><th>性能</th><th></th></tr>
+            </thead>
+            <tbody>
+              {releasedProducts.map(product => {
+                const elapsed = Math.max(0, game.week - (product.releasedWeek ?? 0));
+                return (
+                  <tr key={product.id}>
+                    <th scope="row">
+                      <div className="product-cell">
+                        <ProductSprite categoryId={product.categoryId} year={currentYear} size="sm" />
+                        <span>{product.name}</span>
+                      </div>
+                    </th>
+                    <td>{product.releasedWeek ? product.releasedWeek + 1 : 0}週</td>
+                    <td>{elapsed}週間経過</td>
+                    <td>{product.performance}</td>
+                    <td>
+                      <button
+                        className="secondary"
+                        onClick={() => dispatch({ type: 'minorChangeProduct', productId: product.id })}
+                        disabled={game.company.accounts.cash < 50}
+                      >
+                        改良する（50万円）
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Panel>
+      ) : null}
     </>
   );
 }
