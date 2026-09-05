@@ -1,56 +1,158 @@
-import { StrictMode, useState } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { calendarAt } from '../../../packages/simulation/src/calendar';
-import { isHealthResponse } from '../../../packages/contracts/src/health';
+import { economyRules } from '../../../packages/content/src/rules';
+import { formatBrand, formatMoney } from '../../../packages/simulation/src/money';
+import { currentDate, goalProgress, scenarioProgress } from '../../../packages/simulation/src/selectors';
+import type { GameState } from '../../../packages/simulation/src/types';
+import { Factory } from './screens/Factory';
+import { Finance } from './screens/Finance';
+import { Lab } from './screens/Lab';
+import { Office } from './screens/Office';
+import { SalesOffice } from './screens/SalesOffice';
+import { Title } from './screens/Title';
+import { useGameStore, type ScreenId } from './store';
 import './style.css';
 
-function App() {
-  const [elapsedWeeks, setElapsedWeeks] = useState(0);
-  const [connection, setConnection] = useState('未確認');
-  const [checking, setChecking] = useState(false);
-  const date = calendarAt(elapsedWeeks);
+const navigation: { id: ScreenId; label: string; role: string }[] = [
+  { id: 'office', label: '社長室', role: '経営者' },
+  { id: 'lab', label: '研究所', role: '設計統括' },
+  { id: 'factory', label: '工場', role: '生産統括' },
+  { id: 'sales', label: '販売本部', role: '販売統括' },
+  { id: 'finance', label: '経理部', role: '経理統括' },
+];
 
-  async function checkConnection() {
-    setChecking(true);
-    setConnection('確認中…');
-    try {
-      const response = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
-      const data: unknown = await response.json();
-      if (!response.ok || !isHealthResponse(data)) throw new Error('Invalid health response');
-      setConnection('接続成功：APIとデータベースが応答しました。');
-    } catch {
-      setConnection('接続できません。APIの起動とデータベースの初期化を確認してください。');
-    } finally {
-      setChecking(false);
-    }
-  }
-
-  return <main>
-    <header><span>KADEN WAR</span><p>開発基盤 / S0</p></header>
-    <h1>家電戦争</h1>
-    <p className="lead">暮らしを変える家電を、あなたの会社から。</p>
-    <p>現在は開発基盤の検証段階です。製品開発・生産・販売・保存はこれから実装します。</p>
-    <section aria-labelledby="calendar-title">
-      <p className="eyebrow">01 / ゲーム内暦</p>
-      <h2 id="calendar-title">週を重ね、時代を進める</h2>
-      <p>1か月は4週、1年は48週。ここでは暦の表示だけを試せます。</p>
-      <p className="date" aria-live="polite">{date.year}年 {date.month}月 第{date.week}週</p>
-      <div className="actions">
-        <button onClick={() => setElapsedWeeks(w => w + 1)}>1週進める</button>
-        <button onClick={() => setElapsedWeeks(w => w + 4)}>4週進める</button>
-        <button className="secondary" onClick={() => setElapsedWeeks(0)}>初期日に戻す</button>
+function TopBar({ game }: { game: GameState }) {
+  const advance = useGameStore(store => store.advance);
+  const progress = scenarioProgress(game);
+  const playing = game.status === 'playing';
+  return (
+    <div className="topbar">
+      <div>
+        <p className="company">{game.company.name}</p>
+        <p className="date" aria-live="polite">{currentDate(game)}</p>
       </div>
-      <small>決算・費用計算は未実装です。再読み込みすると初期日に戻ります。</small>
+      <dl className="topbar-metrics">
+        <div><dt>現金</dt><dd>{formatMoney(game.company.accounts.cash)}</dd></div>
+        <div><dt>ブランド</dt><dd>{formatBrand(game.company.brandBasis)}</dd></div>
+        <div><dt>累計売上</dt><dd>{formatMoney(game.totals.revenue)}</dd></div>
+        <div><dt>累計利益</dt><dd>{formatMoney(game.totals.profit)}</dd></div>
+        <div><dt>残り</dt><dd>{progress.weeksRemaining}週</dd></div>
+      </dl>
+      <div className="actions">
+        <button disabled={!playing} onClick={() => advance(1)}>1週進める</button>
+        <button disabled={!playing} onClick={() => advance(4)}>1か月進める</button>
+      </div>
+    </div>
+  );
+}
+
+function Notice() {
+  const notice = useGameStore(store => store.notice);
+  const dismiss = useGameStore(store => store.dismissNotice);
+  if (!notice) return null;
+  return (
+    <p className={notice.kind === 'error' ? 'notice error' : 'notice'} role="status">
+      {notice.text}
+      <button className="link" onClick={dismiss}>閉じる</button>
+    </p>
+  );
+}
+
+function FundsDialog({ game }: { game: GameState }) {
+  const prompt = useGameStore(store => store.fundsPrompt);
+  const advance = useGameStore(store => store.advance);
+  const setScreen = useGameStore(store => store.setScreen);
+  const dismiss = useGameStore(store => store.dismissFundsPrompt);
+  if (!prompt) return null;
+  const remaining = economyRules.maxGraceWeeks - game.company.graceWeeks;
+  return (
+    <div className="funds" role="alertdialog" aria-label="資金不足">
+      <h2>資金不足です</h2>
+      <p>
+        今週の必須支払いは{formatMoney(prompt.required)}ですが、現金は{formatMoney(prompt.cash)}しかありません。
+        借入や支出の見直しをしてから、同じ週をやり直せます。
+      </p>
+      <p>
+        このまま進めると不足分は未払金になり、猶予を1週使います。
+        {economyRules.maxGraceWeeks}週続くと敗北します（残り{remaining}週）。
+      </p>
+      <div className="actions">
+        <button onClick={() => { dismiss(); setScreen('finance'); }}>経理部で資金を手当てする</button>
+        <button className="secondary" onClick={() => advance(Math.max(1, prompt.weeks), true)}>
+          資金不足のまま進める
+        </button>
+        <button className="link" onClick={dismiss}>閉じる</button>
+      </div>
+    </div>
+  );
+}
+
+function Result({ game }: { game: GameState }) {
+  const quit = useGameStore(store => store.quitToTitle);
+  const goals = goalProgress(game);
+  return (
+    <section className={game.status === 'won' ? 'result won' : 'result lost'}>
+      <p className="eyebrow">結果</p>
+      <h2>{game.status === 'won' ? '目標を達成しました' : '目標を達成できませんでした'}</h2>
+      <p>{game.outcome}</p>
+      <ul className="goals">
+        {goals.map(goal => (
+          <li key={goal.label}>
+            <p>
+              <strong>{goal.label}</strong>
+              <span>{goal.current} / {goal.target}</span>
+              {goal.achieved ? <em className="done">達成</em> : <em className="warning">未達</em>}
+            </p>
+          </li>
+        ))}
+      </ul>
+      <button onClick={quit}>タイトルへ戻る</button>
     </section>
-    <section aria-labelledby="connection-title">
-      <p className="eyebrow">02 / 開発用の接続確認</p>
-      <h2 id="connection-title">APIとデータベース</h2>
-      <p>ローカルのWorkersとD1を確認します。セーブデータは送信しません。</p>
-      <button disabled={checking} onClick={() => { void checkConnection(); }}>接続を確認</button>
-      <p role="status">{connection}</p>
-    </section>
-    <footer>次の工程：時間・状態・会計基盤。ゲーム本体の完成や公開を示す画面ではありません。</footer>
-  </main>;
+  );
+}
+
+function App() {
+  const game = useGameStore(store => store.game);
+  const screen = useGameStore(store => store.screen);
+  const setScreen = useGameStore(store => store.setScreen);
+  const quit = useGameStore(store => store.quitToTitle);
+
+  if (!game) return <Title />;
+
+  return (
+    <main>
+      <header>
+        <span>KADEN WAR</span>
+        <p>ローカルデモ / S1〜S3</p>
+      </header>
+      <TopBar game={game} />
+      <nav aria-label="担当">
+        {navigation.map(item => (
+          <button
+            key={item.id}
+            className={screen === item.id ? 'nav active' : 'nav'}
+            aria-current={screen === item.id ? 'page' : undefined}
+            onClick={() => setScreen(item.id)}
+          >
+            {item.label}
+            <small>{item.role}</small>
+          </button>
+        ))}
+        <button className="nav quit" onClick={quit}>やめる</button>
+      </nav>
+      <Notice />
+      <FundsDialog game={game} />
+      {game.status !== 'playing' ? <Result game={game} /> : null}
+      {screen === 'office' ? <Office game={game} /> : null}
+      {screen === 'lab' ? <Lab game={game} /> : null}
+      {screen === 'factory' ? <Factory game={game} /> : null}
+      {screen === 'sales' ? <SalesOffice game={game} /> : null}
+      {screen === 'finance' ? <Finance game={game} /> : null}
+      <footer>
+        週送りで研究・開発・生産・販売・決算が進みます。保存は未実装で、再読み込みすると最初からになります。
+      </footer>
+    </main>
+  );
 }
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
