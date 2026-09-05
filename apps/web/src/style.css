@@ -1,0 +1,21 @@
+:root { font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif; color: #253c36; background: #f2eee3; font-synthesis: none; line-height: 1.8; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 860px; margin: 0 auto; padding: 32px 24px 48px; }
+header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #253c36; gap: 16px; font-weight: 700; letter-spacing: .08em; }
+header p { font-size: .8rem; }
+h1 { font-size: clamp(2.5rem, 8vw, 4.5rem); line-height: 1.2; margin: 40px 0 8px; letter-spacing: .1em; }
+.lead { font-weight: 700; font-size: 1.2rem; }
+section { margin-top: 30px; padding: 24px; background: #fffcf4; border: 1px solid #b7beaf; border-top: 4px solid #758171; }
+h2 { font-size: 1.3rem; margin: 0; }
+.eyebrow { font-size: .8rem; color: #5e6456; margin: 0 0 8px; font-weight: 700; }
+.date { font-size: clamp(1.4rem, 5vw, 2rem); font-weight: 700; font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+button { font: inherit; font-weight: 700; color: #fffdf5; background: #263c36; border: 2px solid #263c36; padding: 8px 18px; min-height: 44px; cursor: pointer; }
+button:hover { background: #41584c; }
+button:focus-visible { outline: 3px solid #a34d27; outline-offset: 4px; }
+button:disabled { opacity: .65; cursor: wait; }
+button.secondary { background: transparent; color: #263c36; }
+small, footer { font-size: .85rem; }
+footer { margin-top: 32px; }
+@media (max-width: 480px) { main { padding: 20px 16px; } section { padding: 18px; } header { letter-spacing: 0; } }

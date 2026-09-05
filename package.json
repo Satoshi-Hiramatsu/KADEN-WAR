@@ -1,0 +1,42 @@
+{
+  "name": "kaden-war",
+  "version": "0.0.2",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "dev": "vite --config apps/web/vite.config.ts",
+    "build": "vite build --config apps/web/vite.config.ts",
+    "preview": "vite preview --config apps/web/vite.config.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/api/tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build && npm run api:build",
+    "api:dev": "wrangler dev --config apps/api/wrangler.jsonc --local --ip 127.0.0.1 --port 8787",
+    "api:types": "wrangler types --config apps/api/wrangler.jsonc apps/api/worker-configuration.d.ts",
+    "api:build": "wrangler deploy --config apps/api/wrangler.jsonc --dry-run --outdir dist/api",
+    "db:migrate": "wrangler d1 migrations apply kaden-war-poc --local --config apps/api/wrangler.jsonc"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260905.1",
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.4.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "eslint": "10.10.0",
+    "playwright": "1.63.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.69.0",
+    "vite": "8.2.2",
+    "vitest": "5.0.0",
+    "wrangler": "4.129.0"
+  }
+}
