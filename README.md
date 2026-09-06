@@ -4,7 +4,7 @@
 プレイヤーは新興家電メーカー「あかつき電機」の代表取締役社長となり、研究・設計・生産・販売・財務・人事の6部門を指揮して、激動の時代を生き抜き業界の覇権を目指します。
 
 [![Cloudflare Workers](https://img.shields.io/badge/Deploy-Cloudflare%20Workers-orange.svg)](https://kaden-war.molkz.com/)
-[![Version](https://img.shields.io/badge/Version-V0.0.7-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-V0.0.8-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](tsconfig.json)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)](#素材名称の扱い)
 

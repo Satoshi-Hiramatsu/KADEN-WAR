@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { scenarios } from '../../../../packages/content/src/scenarios';
 import { isHealthResponse } from '../../../../packages/contracts/src/health';
 import { useGameStore } from '../store';
+import sceneMarketAkiba from '../../../../assets/scenes/scene-market-akiba-v1.png';
 
 export function Title() {
   const startGame = useGameStore(store => store.startGame);
@@ -27,55 +28,72 @@ export function Title() {
 
   return (
     <main className="title-screen">
-      <header>
-        <span>KADEN WAR</span>
-        <p>ローカルデモ / S1〜S3実装中</p>
-      </header>
-      <h1>家電戦争</h1>
-      <p className="lead">暮らしを変える家電を、あなたの会社から。</p>
+      <div className="title-backdrop" style={{ backgroundImage: `url(${sceneMarketAkiba})` }}>
+        <div className="title-scanlines" aria-hidden="true" />
+        <div className="title-vignette" aria-hidden="true" />
 
-      {scenario ? (
-        <section>
-          <p className="eyebrow">シナリオ SC01</p>
-          <h2>{scenario.name}</h2>
-          <p className="date">{scenario.subtitle}</p>
-          <p>{scenario.briefing}</p>
-          <ol className="guidance">
-            {scenario.guidance.map(line => <li key={line}>{line}</li>)}
-          </ol>
-          <label className="field">
-            <span>会社名</span>
-            <input
-              type="text"
-              value={companyName}
-              maxLength={16}
-              onChange={event => setCompanyName(event.target.value)}
-            />
-          </label>
-          <div className="actions">
-            <button onClick={() => startGame({ companyName, seed: 20260905 })}>この条件で始める</button>
-            <button
-              className="secondary"
-              onClick={() => startGame({ companyName, seed: Math.floor(Math.random() * 2 ** 31) })}
-            >
-              乱数を変えて始める
+        <div className="title-stage">
+          <p className="title-kicker">K A D E N &nbsp; W A R</p>
+          <h1 className="title-logo">
+            <span className="title-logo-main">家電</span>
+            <span className="title-logo-accent">戦争</span>
+          </h1>
+          <p className="title-copy">暮らしを変える家電を、あなたの会社から。</p>
+
+          {scenario ? (
+            <section className="sfc-window">
+              <p className="sfc-eyebrow">SCENARIO 01</p>
+              <h2 className="sfc-heading">{scenario.name}</h2>
+              <p className="sfc-period">{scenario.subtitle}</p>
+              <p className="sfc-briefing">{scenario.briefing}</p>
+              <ol className="sfc-guidance">
+                {scenario.guidance.map(line => <li key={line}>{line}</li>)}
+              </ol>
+
+              <label className="sfc-field">
+                <span>会社名</span>
+                <input
+                  type="text"
+                  value={companyName}
+                  maxLength={16}
+                  onChange={event => setCompanyName(event.target.value)}
+                />
+              </label>
+
+              <div className="sfc-menu" role="menu">
+                <button
+                  className="sfc-menu-item"
+                  onClick={() => startGame({ companyName, seed: 20260905 })}
+                >
+                  この条件で始める
+                </button>
+                <button
+                  className="sfc-menu-item"
+                  onClick={() => startGame({ companyName, seed: Math.floor(Math.random() * 2 ** 31) })}
+                >
+                  乱数を変えて始める
+                </button>
+              </div>
+              <small className="sfc-note">保存機能は未実装です。再読み込みすると最初からになります。</small>
+            </section>
+          ) : null}
+
+          <details className="dev-panel">
+            <summary>開発者向け：API接続確認</summary>
+            <p>
+              ローカルのWorkersとD1を確認します。ゲーム進行はブラウザ内だけで完結し、データは送信しません。
+            </p>
+            <button className="sfc-btn-small" disabled={checking} onClick={() => { void checkConnection(); }}>
+              接続を確認
             </button>
-          </div>
-          <small>保存機能は未実装です。再読み込みすると最初からになります。</small>
-        </section>
-      ) : null}
+            <p role="status">{connection}</p>
+          </details>
 
-      <section>
-        <p className="eyebrow">開発用の接続確認</p>
-        <h2>APIとデータベース</h2>
-        <p>ローカルのWorkersとD1を確認します。ゲーム進行はブラウザ内だけで完結し、データは送信しません。</p>
-        <button disabled={checking} onClick={() => { void checkConnection(); }}>接続を確認</button>
-        <p role="status">{connection}</p>
-      </section>
-
-      <footer>
-        次の工程：入門シナリオの競合AI・イベント（S4）と保存（S5）。ゲーム本体の完成や公開を示す画面ではありません。
-      </footer>
+          <p className="title-version">
+            ローカルデモ / S1〜S3実装中 / 次の工程：入門シナリオの競合AI・イベント（S4）と保存（S5）
+          </p>
+        </div>
+      </div>
     </main>
   );
 }

@@ -8,15 +8,13 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 main { max-width: 1160px; margin: 0 auto; padding: 20px 20px 48px; }
-main.title-screen { max-width: 860px; padding: 32px 24px 48px; }
+main.title-screen { max-width: none; padding: 0; margin: 0; }
 
 header {
   display: flex; align-items: center; justify-content: space-between;
   border-bottom: 3px solid #253c36; gap: 16px; font-weight: 700; letter-spacing: .08em;
 }
 header p { font-size: .8rem; margin: 0; }
-h1 { font-size: clamp(2.5rem, 8vw, 4.5rem); line-height: 1.2; margin: 40px 0 8px; letter-spacing: .1em; }
-.lead { font-weight: 700; font-size: 1.2rem; }
 
 section {
   margin-top: 20px; padding: 22px; background: #fffdf7;
@@ -356,4 +354,300 @@ input[type="number"] { width: 120px; }
   table { display: block; overflow-x: auto; }
   .news-card-hero { flex-direction: column; }
   .news-image-thumb { width: 100%; height: 100px; }
+}
+
+/* ==========================================
+   タイトル画面（スーパーファミコン風オープニング）
+   ========================================== */
+.title-screen {
+  min-height: 100vh;
+  background: #0a0f18;
+}
+
+.title-backdrop {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  background-size: cover;
+  background-position: center 30%;
+  overflow: hidden;
+  padding: 6vh 16px 40px;
+  font-family: "DotGothic16", "Yu Gothic", sans-serif;
+}
+
+.title-scanlines {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.22) 0px,
+    rgba(0, 0, 0, 0.22) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.title-vignette {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at center 28%, rgba(6, 10, 18, 0.15) 0%, rgba(6, 10, 18, 0.72) 62%, rgba(4, 7, 12, 0.94) 100%),
+    linear-gradient(to bottom, rgba(4, 7, 12, 0.55) 0%, rgba(4, 7, 12, 0.25) 22%, rgba(4, 7, 12, 0.4) 60%, rgba(3, 5, 9, 0.96) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.title-stage {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.title-kicker {
+  font-family: "Press Start 2P", "DotGothic16", monospace;
+  font-size: .62rem;
+  letter-spacing: .35em;
+  color: #ffd97a;
+  text-shadow: 0 0 8px rgba(255, 217, 122, 0.6), 2px 2px 0 rgba(0, 0, 0, 0.8);
+  margin: 0 0 18px;
+}
+
+.title-logo {
+  margin: 0;
+  line-height: 1;
+  font-weight: 700;
+  font-size: clamp(3rem, 13vw, 5.5rem);
+  letter-spacing: .06em;
+}
+
+.title-logo-main,
+.title-logo-accent {
+  display: inline-block;
+  letter-spacing: .02em;
+  text-shadow:
+    -3px -3px 0 #2a1608, 3px -3px 0 #2a1608, -3px 3px 0 #2a1608, 3px 3px 0 #2a1608,
+    -4px 0 0 #2a1608, 4px 0 0 #2a1608, 0 -4px 0 #2a1608, 0 4px 0 #2a1608,
+    0 8px 0 #150a03,
+    0 14px 24px rgba(0, 0, 0, 0.85);
+}
+
+.title-logo-main {
+  color: #ffd766;
+}
+
+.title-logo-accent {
+  color: #ff8a4c;
+}
+
+.title-copy {
+  margin: 18px 0 32px;
+  color: #f4efe0;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: .04em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.6);
+}
+
+/* SFC風ウインドウ（濃紺グラデーション＋二重ピクセル枠） */
+.title-screen .sfc-window {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  color: #e9ecf7;
+  background: linear-gradient(180deg, #1c2450 0%, #10142f 100%);
+  border: 3px solid #f4f4f4;
+  box-shadow:
+    0 0 0 3px #10142f,
+    0 0 0 6px #7ea0e0,
+    0 14px 30px rgba(0, 0, 0, 0.55);
+  clip-path: polygon(
+    10px 0, calc(100% - 10px) 0, 100% 10px,
+    100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%,
+    0 calc(100% - 10px), 0 10px
+  );
+  padding: 22px 26px 26px;
+}
+
+.title-screen .sfc-eyebrow {
+  margin: 0 0 4px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  color: #8fd4ff;
+}
+
+.title-screen .sfc-heading {
+  margin: 0 0 6px;
+  padding-bottom: 8px;
+  font-size: 1.3rem;
+  color: #fff6d8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.title-screen .sfc-period {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffd766;
+  font-variant-numeric: tabular-nums;
+}
+
+.title-screen .sfc-briefing {
+  margin: 0 0 12px;
+  font-size: .88rem;
+  line-height: 1.75;
+  color: #d6dcf2;
+}
+
+.title-screen .sfc-guidance {
+  margin: 0 0 16px;
+  padding-left: 1.4em;
+  font-size: .84rem;
+  line-height: 1.8;
+  color: #c7cef0;
+}
+
+.title-screen .sfc-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+.title-screen .sfc-field span {
+  font-size: .82rem;
+  font-weight: 700;
+  color: #8fd4ff;
+  white-space: nowrap;
+}
+.title-screen .sfc-field input {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  font-family: inherit;
+  font-size: .92rem;
+  padding: 8px 10px;
+  min-height: 36px;
+  background: #0b0f28;
+  color: #fff6d8;
+  border: 2px solid #7ea0e0;
+  caret-color: #ffd766;
+}
+.title-screen .sfc-field input:focus-visible {
+  outline: 2px solid #ffd766;
+  outline-offset: 2px;
+}
+
+.title-screen .sfc-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 14px;
+}
+
+.title-screen .sfc-menu-item {
+  position: relative;
+  font-family: inherit;
+  font-size: .92rem;
+  font-weight: 700;
+  text-align: left;
+  color: #f4efe0;
+  background: linear-gradient(180deg, #2b326b 0%, #171b3d 100%);
+  border: 2px solid #7ea0e0;
+  padding: 10px 16px 10px 30px;
+  min-height: 44px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+}
+.title-screen .sfc-menu-item::before {
+  content: "▶";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ffd766;
+  opacity: 0;
+  transition: opacity .12s ease, left .12s ease;
+}
+.title-screen .sfc-menu-item:hover,
+.title-screen .sfc-menu-item:focus-visible {
+  background: linear-gradient(180deg, #3a4390 0%, #1f2450 100%);
+  border-color: #ffd766;
+}
+.title-screen .sfc-menu-item:hover::before,
+.title-screen .sfc-menu-item:focus-visible::before {
+  opacity: 1;
+  left: 14px;
+  animation: sfc-cursor-blink 0.8s steps(1) infinite;
+}
+.title-screen .sfc-menu-item:focus-visible {
+  outline: none;
+}
+
+@keyframes sfc-cursor-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: .25; }
+}
+
+.title-screen .sfc-note {
+  display: block;
+  font-size: .74rem;
+  color: #96a0c9;
+}
+
+/* 開発者向け接続確認（折りたたみ） */
+.title-screen .dev-panel {
+  width: 100%;
+  margin-top: 22px;
+  font-size: .78rem;
+  color: #b7bfe0;
+}
+.title-screen .dev-panel summary {
+  cursor: pointer;
+  color: #8fd4ff;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 4px 0;
+}
+.title-screen .dev-panel summary:hover { color: #ffd766; }
+.title-screen .dev-panel p { margin: 8px 0; line-height: 1.6; }
+.title-screen .sfc-btn-small {
+  font-family: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  color: #f4efe0;
+  background: #171b3d;
+  border: 2px solid #7ea0e0;
+  padding: 6px 12px;
+  min-height: 32px;
+}
+.title-screen .sfc-btn-small:hover { border-color: #ffd766; }
+.title-screen .sfc-btn-small:disabled { opacity: .5; }
+
+.title-version {
+  position: relative;
+  z-index: 2;
+  margin: 28px 0 0;
+  padding: 0 8px;
+  font-size: .66rem;
+  letter-spacing: .04em;
+  color: #8b93b8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .title-backdrop { padding: 8vh 12px 32px; background-position: center 20%; }
+  .title-screen .sfc-window { padding: 18px 16px 20px; }
+  .title-screen .sfc-field { flex-wrap: wrap; }
+  .title-screen .sfc-field input { max-width: none; }
 }
