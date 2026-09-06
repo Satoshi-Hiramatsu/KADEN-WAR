@@ -141,13 +141,17 @@ export function SceneBanner({
 }) {
   const bgUrl = getSceneBackgroundUrl(sceneKey, game);
   return (
-    <div className="scene-banner" style={{ backgroundImage: `url(${bgUrl})` }}>
-      <div className="scene-overlay">
+    <>
+      <div className="scene-header-bar">
         {eyebrow ? <p className="scene-eyebrow">{eyebrow}</p> : null}
         {title ? <h2 className="scene-title">{title}</h2> : null}
-        {children}
       </div>
-    </div>
+      <div className="scene-banner" style={{ backgroundImage: `url(${bgUrl})` }}>
+        <div className="scene-overlay">
+          {children}
+        </div>
+      </div>
+    </>
   );
 }
 

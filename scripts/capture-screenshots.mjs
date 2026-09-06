@@ -31,7 +31,7 @@ async function capture() {
     await page.getByRole('button', { name: 'この条件で始める' }).click();
     await page.locator('.topbar .date').waitFor();
 
-    const nav = page.getByRole('navigation', { name: '担当' });
+    const nav = page.getByRole('navigation', { name: '拠点' });
 
     // 2. 社長室（初期状態）
     await page.screenshot({ path: `${OUTPUT_DIR}/02-office.png` });
