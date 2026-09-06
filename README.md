@@ -3,12 +3,12 @@
 日本の家電産業の黄金期と技術革新の変遷をモチーフにした、ブラウザ向け本格経営シミュレーションゲームです。
 プレイヤーは新興家電メーカー「あかつき電機」の代表取締役社長となり、研究・設計・生産・販売・財務・人事の6部門を指揮して、激動の時代を生き抜き業界の覇権を目指します。
 
-[![Cloudflare Workers](https://img.shields.io/badge/Deploy-Cloudflare%20Workers-orange.svg)](https://molkz.com/)
-[![Version](https://img.shields.io/badge/Version-V0.0.6-blue.svg)](CHANGELOG.md)
+[![Cloudflare Workers](https://img.shields.io/badge/Deploy-Cloudflare%20Workers-orange.svg)](https://kaden-war.molkz.com/)
+[![Version](https://img.shields.io/badge/Version-V0.0.7-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](tsconfig.json)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)](#素材名称の扱い)
 
-🎮 **本番公開URL**: [https://molkz.com/](https://molkz.com/) （PCブラウザ・スマホで即時プレイ可能）
+🎮 **本番公開URL**: [https://kaden-war.molkz.com/](https://kaden-war.molkz.com/) （PCブラウザ・スマホで即時プレイ可能）
 
 ---
 

@@ -7,7 +7,7 @@
   "workers_dev": false,
   "routes": [
     {
-      "pattern": "molkz.com",
+      "pattern": "kaden-war.molkz.com",
       "custom_domain": true
     }
   ],

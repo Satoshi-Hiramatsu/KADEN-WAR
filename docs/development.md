@@ -41,9 +41,9 @@ Workers型は `npm run api:types` で生成。DB設定変更後は再生成す�
 
 ## Cloudflare配信
 
-本番URLは [https://molkz.com/](https://molkz.com/)。Web成果物 `dist/web` と `/api/*` のWorkerを1つのWorkersデプロイとして配信する。静的ファイルはWorkers Static Assets、画面遷移はSPAフォールバック、`/api/*` はWorker優先で処理する。D1 `kaden-war-poc` は同じWorkerへバインドする。
+本番URLは [https://kaden-war.molkz.com/](https://kaden-war.molkz.com/)。Web成果物 `dist/web` と `/api/*` のWorkerを1つのWorkersデプロイとして配信する。静的ファイルはWorkers Static Assets、画面遷移はSPAフォールバック、`/api/*` はWorker優先で処理する。D1 `kaden-war-poc` は同じWorkerへバインドする。
 
-手動配信は `npm run deploy`。Webをビルドし、本番D1マイグレーションを適用してからWranglerで公開する。2026-09-06にトップ画面、SPA直接URL、`GET /api/health` のHTTP 200、D1スキーマversion 1、APIの404・405応答を確認済み。503の実環境確認、再配信後の回帰確認、GitHub Actionsによる自動デプロイは未実施。
+手動配信は `npm run deploy`。Webをビルドし、本番D1マイグレーションを適用してからWranglerで公開する。Cloudflare Workers Builds（Git連携CI/CD）のビルド構成は、ビルドコマンド `npm run build`、デプロイコマンド `npx wrangler deploy --config apps/api/wrangler.jsonc`、バージョンコマンド `npx wrangler versions upload --config apps/api/wrangler.jsonc`、ルートディレクトリ `/` を設定する。2026-09-06にトップ画面、SPA直接URL、`GET /api/health` のHTTP 200、D1スキーマversion 1、APIの404・405応答を確認済み。503の実環境確認、再配信後の回帰確認は未実施。
 
 ## 公式参照
 

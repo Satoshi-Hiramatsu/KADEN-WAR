@@ -1,9 +1,9 @@
-/* global document, window */
+/* global console */
 import { mkdir } from 'node:fs/promises';
 import process from 'node:process';
 import { chromium } from 'playwright';
 
-const BASE_URL = process.env.TARGET_URL || 'https://molkz.com/';
+const BASE_URL = process.env.TARGET_URL || 'https://kaden-war.molkz.com/';
 const OUTPUT_DIR = 'docs/screenshots';
 
 async function capture() {

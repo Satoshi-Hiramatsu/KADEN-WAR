@@ -2,6 +2,30 @@
 
 リポジトリの更新履歴です。ゲーム製品版v1.0の完成・公開を示すものではありません。
 
+## V0.0.7 — 2026-09-06 / 本番公開サブドメイン運用（kaden-war.molkz.com）とCloudflare Workers Builds対応
+
+対応: 本番エッジ配信のカスタムドメインを `molkz.com` からサブドメイン `kaden-war.molkz.com` へ切り替え、Cloudflare Workers Builds（Git連携CI/CD）での自動ビルド・デプロイ設定手順の整理、関連ドキュメントおよび自動撮影スクリプトの参照先統一、バージョン0.0.7への引き上げ。
+
+- **本番カスタムドメインのサブドメイン運用**:
+  - `apps/api/wrangler.jsonc` のカスタムドメインルーティングを `molkz.com` から `kaden-war.molkz.com` に変更。
+  - 本番公開URLを `https://kaden-war.molkz.com/` に統一。
+  - ルートドメインと本ゲーム用サブドメインの用途を分離。
+- **Cloudflare Workers Builds CI/CD構成の明確化**:
+  - Cloudflare Workers Builds実行時にルート直下の設定ファイル不在による自動初期化エラー（`The assets property in your configuration is missing the required directory property.`）を防止するため、ビルド構成の指定内容（Build command: `npm run build`、Deploy command: `npx wrangler deploy --config apps/api/wrangler.jsonc`、Version command: `npx wrangler versions upload --config apps/api/wrangler.jsonc`）を整理し、`docs/development.md` に明記。
+- **ドキュメント・スクリプトの追従**:
+  - `README.md` のバッジおよび本番URLリンクを `https://kaden-war.molkz.com/` に更新。
+  - `docs/development.md` のCloudflare配信手順を更新。
+  - `scripts/capture-screenshots.mjs` のデフォルト接続先を `https://kaden-war.molkz.com/` に変更。
+- `package.json` および `package-lock.json` のバージョンを `0.0.7` に更新。
+
+### 利用者への影響
+- ゲームへのアクセス先URLが `https://kaden-war.molkz.com/` に変更されます。
+
+### 検証結果と制約
+- `npm run check` がコード0で成功。TypeScript厳格型検査（Web・API）、ESLint、単体・結合テスト36件、Web本番ビルド、Worker dry-runを確認。
+- `apps/api/wrangler.jsonc` のルーティング変更に伴い、Cloudflare側でのDNSレコードおよびSSL証明書の自動反映が必要（再デプロイまたはダッシュボードでのカスタムドメイン追加）。
+- 未検証・未実装: IndexedDBによるローカル保存・再開（S5）、競合AIの高度な自律意思決定（S4）、規格戦争・特許（S6〜S8）、クラウドセーブ同期（S10）。
+
 ## V0.0.6 — 2026-09-06 / Cloudflare本番公開（molkz.com）とREADMEビジュアル刷新
 
 対応: Cloudflare Workers Static AssetsおよびD1による本番公開の完了、GitHub READMEのゲーム内スクリーンショット統合による全面ビジュアルリッチ化、シーン背景上のテキストコントラスト改善、バージョン0.0.6への引き上げ。
