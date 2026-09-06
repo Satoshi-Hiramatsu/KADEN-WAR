@@ -3,6 +3,7 @@ import { applyCommand, loanLimit, type Command } from './commands';
 import { defaultModuleIds, evaluateDesign } from './design';
 import { stateHash } from './hash';
 import { balanceSheet, cashFlowStatement } from './ledger';
+import { evaluateDevelopmentMeeting } from './meeting';
 import { createGame } from './setup';
 import { advanceWeek, advanceWeeks, productionCapacityUnits } from './week';
 import type { GameState } from './types';
@@ -153,7 +154,7 @@ describe('設計と研究', () => {
     expect(evaluation.ok).toBe(false);
   });
 
-  it('プレビューと開発案件の仕様が一致する', () => {
+  it('プレビューと開発案件の仕様が一致する（性能は会議結果の補正幅の範囲内）', () => {
     const state = newGame();
     const evaluation = evaluateDesign({
       categoryId: 'washer',
@@ -168,10 +169,12 @@ describe('設計と研究', () => {
     }]);
     const project = started.company.projects[0];
     if (!project) throw new Error('開発案件がありません。');
-    expect(project.performance).toBe(evaluation.spec.performance);
+    // 性能だけは開発会議の結果（技術力・士気による乱数補正）で±15の範囲で変動しうる。
+    expect(Math.abs(project.performance - evaluation.spec.performance)).toBeLessThanOrEqual(15);
     expect(project.unitCost).toBe(evaluation.spec.unitCost);
     expect(project.devWeeks).toBe(evaluation.spec.devWeeks);
     expect(project.devCost).toBe(evaluation.spec.devCost);
+    expect(project.meetingLog.length).toBeGreaterThan(0);
   });
 
   it('研究が完了すると技術を獲得し、二重に消費しない', () => {
@@ -184,6 +187,103 @@ describe('設計と研究', () => {
     expect(state.company.research.themeId).toBeNull();
     const again = applyCommand(state, { type: 'setResearchTheme', themeId: 'res-efficiency-1' });
     expect(again.ok).toBe(false);
+  });
+});
+
+describe('開発会議', () => {
+  it('付加価値項目は先進性・目新しさ・実用性と原価・性能に反映される', () => {
+    const state = newGame();
+    const bare = evaluateDesign({
+      categoryId: 'refrigerator',
+      moduleIds: defaultModuleIds('refrigerator'),
+      qualityLevel: 0,
+      ownedTechIds: state.company.ownedTechIds,
+      currentYear: state.startYear + 10,
+    });
+    const withFeatures = evaluateDesign({
+      categoryId: 'refrigerator',
+      moduleIds: defaultModuleIds('refrigerator'),
+      qualityLevel: 0,
+      ownedTechIds: state.company.ownedTechIds,
+      featureIds: ['feat-refr-veggie-large', 'feat-refr-door-pocket'],
+      currentYear: state.startYear + 10,
+    });
+    if (!bare.ok || !withFeatures.ok) throw new Error('設計評価に失敗しました。');
+    expect(withFeatures.spec.practicality).toBeGreaterThan(bare.spec.practicality);
+    expect(withFeatures.spec.unitCost).toBeGreaterThan(bare.spec.unitCost);
+    expect(withFeatures.spec.performance).toBeGreaterThan(bare.spec.performance);
+  });
+
+  it('年代が来ていない付加価値項目は拒否される', () => {
+    const state = newGame();
+    const evaluation = evaluateDesign({
+      categoryId: 'refrigerator',
+      moduleIds: defaultModuleIds('refrigerator'),
+      qualityLevel: 0,
+      ownedTechIds: state.company.ownedTechIds,
+      featureIds: ['feat-refr-app-link'], // 2008年以降の項目
+      currentYear: state.startYear,
+    });
+    expect(evaluation.ok).toBe(false);
+  });
+
+  it('選択上限を超える付加価値項目は拒否される', () => {
+    const state = newGame();
+    const evaluation = evaluateDesign({
+      categoryId: 'refrigerator',
+      moduleIds: defaultModuleIds('refrigerator'),
+      qualityLevel: 0,
+      ownedTechIds: state.company.ownedTechIds,
+      featureIds: [
+        'feat-refr-veggie-large', 'feat-refr-door-pocket', 'feat-refr-egg-tray',
+        'feat-refr-adjust-shelf', 'feat-refr-color-variant', 'feat-refr-fingerprint',
+        'feat-refr-wood-panel', 'feat-refr-reversible-door', 'feat-refr-anti-tip',
+      ],
+      currentYear: state.startYear,
+    });
+    expect(evaluation.ok).toBe(false);
+  });
+
+  it('生産性・実用性を無視した野心的すぎる設計には反対意見が出る', () => {
+    const state = newGame();
+    const evaluation = evaluateDesign({
+      categoryId: 'refrigerator',
+      moduleIds: defaultModuleIds('refrigerator'),
+      qualityLevel: 3,
+      ownedTechIds: state.company.ownedTechIds,
+      currentYear: state.startYear,
+      featureIds: [],
+    });
+    if (!evaluation.ok) throw new Error(evaluation.error);
+    // 品質最大まで積んだだけの設計は、コスト自体は生産統括の許容範囲内のはず。
+    const meeting = evaluateDevelopmentMeeting(state, evaluation.spec);
+    expect(meeting.stances.find(s => s.id === 'production')?.tone).not.toBe('objection');
+  });
+
+  it('反対意見があるまま押し切ると士気が下がり、押し切らなければ着手できない', () => {
+    const base = newGame();
+    // 未来まで週を進め、技術不要だが原価・開発期間のかさむ付加価値項目をすべて解禁する。
+    const state: GameState = { ...base, week: 2400 };
+    const expensiveFeatureIds = [
+      'feat-refr-stainless-premium', 'feat-refr-pullout-freezer', 'feat-refr-large-interior',
+      'feat-refr-voice-notice', 'feat-refr-deodorize', 'feat-refr-outage-mode',
+      'feat-refr-quiet-body', 'feat-refr-swing-sensor',
+    ];
+    const command = {
+      type: 'startDevelopment' as const,
+      name: '野心作',
+      categoryId: 'refrigerator',
+      moduleIds: defaultModuleIds('refrigerator'),
+      qualityLevel: 3,
+      featureIds: expensiveFeatureIds,
+    };
+
+    const blocked = applyCommand(state, command);
+    expect(blocked.ok).toBe(false);
+
+    const overridden = must(applyCommand(state, { ...command, overrideObjections: true }));
+    expect(overridden.company.projects.length).toBe(1);
+    expect(overridden.company.personnel.morale).toBeLessThan(state.company.personnel.morale);
   });
 });
 

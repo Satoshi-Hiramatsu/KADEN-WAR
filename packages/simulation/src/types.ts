@@ -73,6 +73,8 @@ export type DevelopmentProject = {
   moduleIds: readonly string[];
   /** 品質への追加投資（0〜3）。 */
   qualityLevel: number;
+  /** 開発会議で選んだ付加価値項目。 */
+  featureIds: readonly string[];
   performance: number;
   energy: number;
   /** 標準製造原価（千円）。 */
@@ -82,6 +84,14 @@ export type DevelopmentProject = {
   paidCost: Money;
   startedWeek: number;
   remainingWeeks: number;
+  /** 先進性：技術的な野心度。 */
+  advancement: number;
+  /** 目新しさ：市場での話題性。 */
+  novelty: number;
+  /** 実用性：日常使いでの価値。 */
+  practicality: number;
+  /** 開発会議での議論の要点。 */
+  meetingLog: readonly string[];
 };
 
 export type Product = {
@@ -90,6 +100,7 @@ export type Product = {
   categoryId: CategoryId;
   moduleIds: readonly string[];
   qualityLevel: number;
+  featureIds: readonly string[];
   performance: number;
   energy: number;
   /** 標準製造原価（千円）。 */
@@ -108,6 +119,10 @@ export type Product = {
   totalRevenue: Money;
   lastWeekUnitsSold: number;
   lastWeekShareBasis: number;
+  advancement: number;
+  novelty: number;
+  practicality: number;
+  meetingLog: readonly string[];
 };
 
 export type AdvertisingCampaignType = 'tv' | 'newspaper' | 'store';

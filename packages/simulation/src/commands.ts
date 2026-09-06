@@ -1,15 +1,28 @@
 import { channels, findChannel, type ChannelId } from '../../content/src/channels';
-import { economyRules } from '../../content/src/rules';
+import { findExecutive } from '../../content/src/executives';
+import { findMeetingCast, type MeetingCastId } from '../../content/src/meetingCast';
+import { economyRules, weeksPerYear } from '../../content/src/rules';
 import { findResearchTheme } from '../../content/src/technology';
-import { evaluateDesign } from './design';
+import { evaluateDesign, type DesignSpec } from './design';
 import { payCash, post } from './ledger';
+import { evaluateDevelopmentMeeting, type MeetingAttendeeId } from './meeting';
+import { nextInt } from './rng';
 import { productionCapacityUnits } from './week';
 import type { CommandResult, DevelopmentProject, GameState, Money } from './types';
 
 export type Command =
   | { type: 'setResearchTheme'; themeId: string | null }
   | { type: 'setResearchBudget'; amount: Money }
-  | { type: 'startDevelopment'; name: string; categoryId: string; moduleIds: readonly string[]; qualityLevel: number }
+  | {
+      type: 'startDevelopment';
+      name: string;
+      categoryId: string;
+      moduleIds: readonly string[];
+      qualityLevel: number;
+      featureIds?: readonly string[];
+      /** 会議で反対意見が出た設計を、社長決裁で押し切って着手する。 */
+      overrideObjections?: boolean;
+    }
   | { type: 'cancelDevelopment'; projectId: string }
   | { type: 'setPrice'; productId: string; price: number }
   | { type: 'setProductionPlan'; productId: string; units: number }
@@ -34,6 +47,39 @@ export function loanLimit(state: GameState): Money {
 
 function fail(state: GameState, error: string): CommandResult {
   return { ok: false, error, state };
+}
+
+function meetingRoleLabel(id: MeetingAttendeeId): string {
+  if (id === 'design-chief' || id === 'design-associate') {
+    return findMeetingCast(id as MeetingCastId).role;
+  }
+  return findExecutive(id).role;
+}
+
+/**
+ * 会議での議論を経た完成品への性能補正を1回だけ乱数で引く。
+ * 技術の成熟度（先進性に対して保有技術がどれだけ追いついているか）と
+ * 社員の士気、反対を押し切ったかどうかで振れ幅が変わる。
+ */
+function rollMeetingOutcome(
+  draft: GameState,
+  spec: DesignSpec,
+  overrideObjections: boolean,
+): { modifier: number; narrative: string } {
+  const techReadiness = draft.company.ownedTechIds.length - spec.advancement / 5;
+  const moraleFactor = (draft.company.personnel.morale - 60) / 10;
+  const overrideBase = overrideObjections ? -6 : 0;
+  const variance = overrideObjections ? 8 : 4;
+  const base = Math.round(techReadiness * 1.5 + moraleFactor * 1.5 + overrideBase);
+  const drawn = nextInt(draft.rng, -variance, variance);
+  draft.rng = drawn.state;
+  const modifier = Math.max(-15, Math.min(15, base + drawn.value));
+  const narrative = modifier > 3
+    ? `会議後、技術力と士気の後押しで完成度が高まった（性能${modifier >= 0 ? '+' : ''}${modifier}）。`
+    : modifier < -3
+      ? `無理を重ねた反動で仕上がりに不安が残った（性能${modifier}）。`
+      : '会議の議論はおおむね想定通りの結果に落ち着いた。';
+  return { modifier, narrative };
 }
 
 /**
@@ -75,11 +121,14 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       if (company.projects.length >= 2) return fail(state, '同時に進められる開発は2件までです。');
       const name = command.name.trim();
       if (name.length === 0 || name.length > 24) return fail(state, '製品名は1〜24文字で指定してください。');
+      const currentYear = draft.startYear + Math.floor(draft.week / weeksPerYear);
       const evaluation = evaluateDesign({
         categoryId: command.categoryId,
         moduleIds: command.moduleIds,
         qualityLevel: command.qualityLevel,
         ownedTechIds: company.ownedTechIds,
+        featureIds: command.featureIds ?? [],
+        currentYear,
       });
       if (!evaluation.ok) return fail(state, evaluation.error);
       const spec = evaluation.spec;
@@ -87,13 +136,38 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       if (company.accounts.cash < firstInstallment) {
         return fail(state, `開発の初回費用${firstInstallment}万円を払う現金がありません。`);
       }
+
+      const meetingEvaluation = evaluateDevelopmentMeeting(draft, spec);
+      const overrideObjections = command.overrideObjections ?? false;
+      if (meetingEvaluation.blocking && !overrideObjections) {
+        return fail(state, '開発会議で反対意見が出ています。設計を見直すか、社長決裁で押し切ってください。');
+      }
+      if (meetingEvaluation.blocking && overrideObjections) {
+        company.personnel.morale = Math.max(10, company.personnel.morale - 5);
+      }
+
+      const outcome = rollMeetingOutcome(draft, spec, meetingEvaluation.blocking && overrideObjections);
+      const finalPerformance = Math.max(1, spec.performance + outcome.modifier);
+      const meetingLog: string[] = [
+        `会議の結論：${
+          meetingEvaluation.verdict === 'approved'
+            ? '全会一致で承認'
+            : meetingEvaluation.verdict === 'concern'
+              ? '懸念を残しつつ承認'
+              : '反対を押し切って承認'
+        }。`,
+        ...meetingEvaluation.stances.map(stance => `${meetingRoleLabel(stance.id)}：${stance.comment}`),
+        outcome.narrative,
+      ];
+
       const project: DevelopmentProject = {
         id: `project-${draft.commandSeq + 1}`,
         name,
         categoryId: spec.categoryId,
         moduleIds: spec.moduleIds,
         qualityLevel: spec.qualityLevel,
-        performance: spec.performance,
+        featureIds: spec.featureIds,
+        performance: finalPerformance,
         energy: spec.energy,
         unitCost: spec.unitCost,
         devWeeks: spec.devWeeks,
@@ -101,6 +175,10 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
         paidCost: 0,
         startedWeek: draft.week,
         remainingWeeks: spec.devWeeks,
+        advancement: spec.advancement,
+        novelty: spec.novelty,
+        practicality: spec.practicality,
+        meetingLog,
       };
       company.projects.push(project);
       break;

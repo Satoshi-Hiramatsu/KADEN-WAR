@@ -1,4 +1,5 @@
 import type { ExecutiveId } from '../../../packages/content/src/executives';
+import type { MeetingCastId } from '../../../packages/content/src/meetingCast';
 import type { GameState } from '../../../packages/simulation/src/types';
 
 // ==========================================
@@ -34,6 +35,9 @@ import personnelDelighted from '../../../assets/portraits/personnel-delighted-v1
 import personnelWorried from '../../../assets/portraits/personnel-worried-v1.png';
 import personnelMotivate from '../../../assets/portraits/personnel-motivate-v1.png';
 
+import designChiefNormal from '../../../assets/portraits/design-chief-normal-v1.png';
+import designAssociateNormal from '../../../assets/portraits/design-associate-normal-v1.png';
+
 import npcBanker from '../../../assets/portraits/npc-banker-v1.png';
 import npcJournalist from '../../../assets/portraits/npc-journalist-v1.png';
 import npcShopkeeper from '../../../assets/portraits/npc-shopkeeper-v1.png';
@@ -67,6 +71,7 @@ import sceneBoardroomVictory from '../../../assets/scenes/scene-boardroom-victor
 import sceneLabWorkshop from '../../../assets/scenes/scene-lab-workshop-v1.png';
 import sceneLabBreakthrough from '../../../assets/scenes/scene-lab-breakthrough-v1.png';
 import sceneLabModern from '../../../assets/scenes/scene-lab-modern-v1.png';
+import sceneLabMeeting from '../../../assets/scenes/scene-lab-meeting-v1.png';
 
 import sceneFactoryEarly from '../../../assets/scenes/scene-factory-early-v1.png';
 import sceneFactoryNight from '../../../assets/scenes/scene-factory-night-v1.png';
@@ -220,6 +225,18 @@ export function getContextualPortrait(executiveId: ExecutiveId, game: GameState)
 }
 
 // ==========================================
+// 開発会議メンバー（設計課長・設計係長）ポートレート
+// ==========================================
+export function getMeetingCastPortraitUrl(id: MeetingCastId): string {
+  switch (id) {
+    case 'design-chief':
+      return designChiefNormal;
+    case 'design-associate':
+      return designAssociateNormal;
+  }
+}
+
+// ==========================================
 // NPCポートレート
 // ==========================================
 export type NpcId = 'banker' | 'journalist' | 'shopkeeper';
@@ -265,6 +282,7 @@ export type SceneKey =
   | 'office'
   | 'meeting'
   | 'lab'
+  | 'labMeeting'
   | 'factory'
   | 'sales'
   | 'finance'
@@ -297,6 +315,9 @@ export function getSceneBackgroundUrl(sceneKey: SceneKey, game?: GameState): str
       if (game && game.company.projects.length > 0) return sceneLabBreakthrough;
       if (currentYear >= 1990) return sceneLabModern;
       return sceneLabWorkshop;
+
+    case 'labMeeting':
+      return sceneLabMeeting;
 
     case 'factory':
       if (game && (game.lastWeek?.defectUnits ?? 0) > 15) return sceneFactoryTrouble;

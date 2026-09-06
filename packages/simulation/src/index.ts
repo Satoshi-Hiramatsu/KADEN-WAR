@@ -4,6 +4,7 @@ export * from './rng';
 export * from './types';
 export * from './ledger';
 export * from './design';
+export * from './meeting';
 export * from './market';
 export * from './setup';
 export * from './commands';

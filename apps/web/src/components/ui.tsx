@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import { findExecutive, type ExecutiveId } from '../../../../packages/content/src/executives';
+import { findMeetingCast, type MeetingCastId } from '../../../../packages/content/src/meetingCast';
 import type { DepartmentReport } from '../../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../../packages/simulation/src/types';
 import {
   getExecutivePortraitUrl,
   getContextualPortrait,
+  getMeetingCastPortraitUrl,
   getProductSpriteUrl,
   getRivalPortraitUrl,
   getNpcPortraitUrl,
@@ -61,6 +63,18 @@ export function ExecutiveHeader({
         ))}
       </div>
     </div>
+  );
+}
+
+export function MeetingCastPortrait({ id, size = 72 }: { id: MeetingCastId; size?: number }) {
+  const cast = findMeetingCast(id);
+  return (
+    <img
+      src={getMeetingCastPortraitUrl(id)}
+      alt={`${cast.role} ${cast.name}`}
+      className="portrait-img"
+      style={{ width: size, height: size, objectFit: 'cover' }}
+    />
   );
 }
 

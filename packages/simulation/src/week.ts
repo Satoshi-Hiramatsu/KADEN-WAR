@@ -140,6 +140,7 @@ function runDevelopment(state: GameState): void {
       categoryId: project.categoryId,
       moduleIds: [...project.moduleIds],
       qualityLevel: project.qualityLevel,
+      featureIds: [...project.featureIds],
       performance: project.performance,
       energy: project.energy,
       unitCost: project.unitCost,
@@ -155,6 +156,10 @@ function runDevelopment(state: GameState): void {
       totalRevenue: 0,
       lastWeekUnitsSold: 0,
       lastWeekShareBasis: 0,
+      advancement: project.advancement,
+      novelty: project.novelty,
+      practicality: project.practicality,
+      meetingLog: [...project.meetingLog],
     };
     company.nextProductNumber += 1;
     company.products.push(product);
@@ -298,7 +303,8 @@ function updateBrand(state: GameState, shares: WeeklyReport['categoryShares']): 
   }
   const shareBasis = demandUnits > 0 ? Math.floor((ownUnits * 10000) / demandUnits) : 0;
   const premium = company.products.some(product => product.onSale && product.performance >= 130) ? 1 : 0;
-  const gain = Math.floor(shareBasis / 120) + premium;
+  const noveltyPremium = company.products.some(product => product.onSale && product.novelty >= 30) ? 1 : 0;
+  const gain = Math.floor(shareBasis / 120) + premium + noveltyPremium;
   const next = company.brandBasis + gain - economyRules.brandDecayBasis;
   company.brandBasis = Math.max(0, Math.min(10000, next));
 }

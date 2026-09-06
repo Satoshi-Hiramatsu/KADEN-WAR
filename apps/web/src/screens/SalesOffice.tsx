@@ -43,7 +43,7 @@ export function SalesOffice({ game }: { game: GameState }) {
         ) : (
           <table>
             <thead>
-              <tr><th>製品</th><th>性能</th><th>原価</th><th>価格</th><th>先週</th><th>販売状態</th><th>操作</th></tr>
+              <tr><th>製品</th><th>性能</th><th>先進/目新/実用</th><th>原価</th><th>価格</th><th>先週</th><th>販売状態</th><th>操作</th></tr>
             </thead>
             <tbody>
               {products.map(product => {
@@ -60,6 +60,7 @@ export function SalesOffice({ game }: { game: GameState }) {
                       </div>
                     </th>
                     <td>{product.performance}</td>
+                    <td>{product.advancement} / {product.novelty} / {product.practicality}</td>
                     <td>{formatThousandYen(product.unitCost)}</td>
                     <td>
                       <NumberField

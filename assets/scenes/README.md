@@ -21,3 +21,9 @@
 - `scene-event-launch-v1.png` / `scene-event-expo-v1.png`：新製品発表会・見本市。
 - `scene-news-paper-v1.png` / `scene-event-boom-v1.png` / `scene-event-recession-v1.png`：号外枠・好況・不況イベント。
 
+## 開発会議シーン追加（2026-09-06、作成済み・承認待ち）
+
+`scene-lab-workshop-v1.png` を画風参照として ElevenLabs Creative（gpt-image-2）で生成。1280×720。人物は含めず、図面と試作品を囲む会議テーブルのみとし、UI側でポートレートを周囲に重ねられるよう上部・左右に余白を確保。
+
+- `scene-lab-meeting-v1.png`：研究所の開発会議室。図面・試作機・黒板・書棚のある会議テーブル。
+

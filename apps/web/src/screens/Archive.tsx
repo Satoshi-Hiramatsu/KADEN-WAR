@@ -44,6 +44,7 @@ export function Archive({ game }: { game: GameState }) {
                   </div>
                   <dl className="archive-specs">
                     <div><dt>性能指数</dt><dd>{product.performance}</dd></div>
+                    <div><dt>先進/目新/実用</dt><dd>{product.advancement} / {product.novelty} / {product.practicality}</dd></div>
                     <div><dt>販売価格</dt><dd>{formatThousandYen(product.price)}</dd></div>
                     <div><dt>累計販売数</dt><dd>{product.totalUnitsSold}台</dd></div>
                     <div><dt>累計売上高</dt><dd>{formatMoney(product.totalRevenue)}</dd></div>

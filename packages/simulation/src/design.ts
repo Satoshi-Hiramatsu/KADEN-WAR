@@ -1,10 +1,12 @@
 import { findCategory, type CategoryId } from '../../content/src/categories';
+import { extraDevWeeksForFeatureCount, findFeature, maxSelectableFeatures } from '../../content/src/features';
 import { findModule, moduleSlots } from '../../content/src/technology';
 
 export type DesignSpec = {
   categoryId: CategoryId;
   moduleIds: readonly string[];
   qualityLevel: number;
+  featureIds: readonly string[];
   performance: number;
   energy: number;
   /** 標準製造原価（千円）。 */
@@ -13,6 +15,12 @@ export type DesignSpec = {
   devCost: number;
   /** 原価から求めた推奨価格（千円）。 */
   suggestedPrice: number;
+  /** 先進性：技術的な野心度。 */
+  advancement: number;
+  /** 目新しさ：市場での話題性。 */
+  novelty: number;
+  /** 実用性：日常使いでの価値。 */
+  practicality: number;
 };
 
 export type DesignEvaluation = { ok: true; spec: DesignSpec } | { ok: false; error: string };
@@ -25,6 +33,9 @@ export type DesignInput = {
   moduleIds: readonly string[];
   qualityLevel: number;
   ownedTechIds: readonly string[];
+  featureIds?: readonly string[];
+  /** 付加価値項目の解禁判定に使う現在年。省略時は解禁チェックを行わない。 */
+  currentYear?: number;
 };
 
 /**
@@ -49,6 +60,7 @@ export function evaluateDesign(input: DesignInput): DesignEvaluation {
   let devWeeks = category.baseDevWeeks;
   let devCost = category.baseDevCost;
   let energyTotal = 0;
+  let energyDelta = 0;
 
   for (let index = 0; index < moduleSlots.length; index += 1) {
     const slot = moduleSlots[index];
@@ -74,8 +86,41 @@ export function evaluateDesign(input: DesignInput): DesignEvaluation {
   unitCost += input.qualityLevel * 2;
   devWeeks += input.qualityLevel;
   devCost += input.qualityLevel * 130;
+  let advancement = input.qualityLevel * 2;
+  let novelty = 0;
+  let practicality = input.qualityLevel * 2;
 
-  const energy = Math.round(energyTotal / moduleSlots.length);
+  const featureIds = input.featureIds ?? [];
+  if (featureIds.length > maxSelectableFeatures) {
+    return { ok: false, error: `付加価値項目は同時に${maxSelectableFeatures}件までです。` };
+  }
+  const seenFeatureIds = new Set<string>();
+  for (const featureId of featureIds) {
+    if (seenFeatureIds.has(featureId)) return { ok: false, error: `付加価値項目が重複しています: ${featureId}` };
+    seenFeatureIds.add(featureId);
+    const feature = findFeature(featureId);
+    if (!feature) return { ok: false, error: `付加価値項目が見つかりません: ${featureId}` };
+    if (feature.categoryId !== category.id) {
+      return { ok: false, error: `${category.name}に使えない付加価値項目です: ${feature.name}` };
+    }
+    if (feature.requiredTechId && !input.ownedTechIds.includes(feature.requiredTechId)) {
+      return { ok: false, error: `未解禁の付加価値項目です: ${feature.name}` };
+    }
+    if (input.currentYear !== undefined && input.currentYear < feature.minYear) {
+      return { ok: false, error: `時期尚早の付加価値項目です: ${feature.name}` };
+    }
+    performance += feature.performance;
+    unitCost += feature.unitCost;
+    devWeeks += feature.devWeeks;
+    devCost += feature.devCost;
+    energyDelta += feature.energy;
+    advancement += feature.advancement;
+    novelty += feature.novelty;
+    practicality += feature.practicality;
+  }
+  devWeeks += extraDevWeeksForFeatureCount(featureIds.length);
+
+  const energy = Math.round(energyTotal / moduleSlots.length) + energyDelta;
   const suggestedPrice = Math.max(1, Math.floor((unitCost * category.suggestedMarginBasis) / 10000));
 
   return {
@@ -84,12 +129,16 @@ export function evaluateDesign(input: DesignInput): DesignEvaluation {
       categoryId: category.id,
       moduleIds: [...input.moduleIds],
       qualityLevel: input.qualityLevel,
+      featureIds: [...featureIds],
       performance,
       energy,
       unitCost,
       devWeeks,
       devCost,
       suggestedPrice,
+      advancement,
+      novelty,
+      practicality,
     },
   };
 }

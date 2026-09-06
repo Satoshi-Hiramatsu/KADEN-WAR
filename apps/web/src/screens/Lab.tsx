@@ -17,6 +17,8 @@ import { useGameStore } from '../store';
 
 export function Lab({ game }: { game: GameState }) {
   const dispatch = useGameStore(store => store.dispatch);
+  const setScreen = useGameStore(store => store.setScreen);
+  const setDevelopmentDraft = useGameStore(store => store.setDevelopmentDraft);
   const report = departmentReports(game).find(entry => entry.executiveId === 'design');
   const owned = game.company.ownedTechIds;
   const currentYear = game.startYear + Math.floor(game.week / 48);
@@ -171,21 +173,29 @@ export function Lab({ game }: { game: GameState }) {
                 { label: '推奨価格', value: formatThousandYen(evaluation.spec.suggestedPrice) },
               ]}
             />
-            <button onClick={() => dispatch({ type: 'startDevelopment', name, categoryId, moduleIds, qualityLevel: quality })}>
-              この設計で開発を始める
+            <button
+              onClick={() => {
+                setDevelopmentDraft({ categoryId, moduleIds, qualityLevel: quality, name, featureIds: [] });
+                setScreen('developmentMeeting');
+              }}
+            >
+              この設計で開発会議にかける
             </button>
           </>
         ) : (
           <p className="warning">！ {evaluation.error}</p>
         )}
-        <small>開発費は開発期間に分けて毎週支払います。同時に進められる開発は2件までです。</small>
+        <small>
+          開発費は開発期間に分けて毎週支払います。同時に進められる開発は2件までです。
+          開発会議では追加の付加価値項目を選び、設計・生産・販売の各統括や社長の反応を見てから正式に着手します。
+        </small>
       </Panel>
 
       <Panel eyebrow="03 / 開発中" title="進行中の案件">
         {game.company.projects.length === 0 ? <p>進行中の開発はありません。</p> : (
           <table>
             <thead>
-              <tr><th>製品</th><th>残り</th><th>開発費</th><th>見込原価</th><th></th></tr>
+              <tr><th>製品</th><th>残り</th><th>開発費</th><th>見込原価</th><th>先進/目新/実用</th><th></th></tr>
             </thead>
             <tbody>
               {game.company.projects.map(project => (
@@ -199,6 +209,7 @@ export function Lab({ game }: { game: GameState }) {
                   <td>{project.remainingWeeks}週</td>
                   <td>{formatMoney(project.paidCost)} / {formatMoney(project.devCost)}</td>
                   <td>{formatThousandYen(project.unitCost)}</td>
+                  <td>{project.advancement} / {project.novelty} / {project.practicality}</td>
                   <td>
                     <button className="secondary" onClick={() => dispatch({ type: 'cancelDevelopment', projectId: project.id })}>
                       中止

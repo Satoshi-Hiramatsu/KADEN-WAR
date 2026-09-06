@@ -90,6 +90,8 @@ button:focus-visible { outline: 3px solid #a34d27; outline-offset: 3px; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 button.secondary { background: #fffdf7; color: #263c36; border-color: #8f9888; }
 button.secondary:hover { background: #eae5d7; }
+button.danger { background: #8c3a12; border-color: #8c3a12; color: #fffdf5; }
+button.danger:hover { background: #a3481a; }
 button.link {
   background: none; border: none; color: #2f6b45; text-decoration: underline;
   padding: 4px 6px; min-height: auto; font-weight: 700; box-shadow: none;
@@ -684,6 +686,37 @@ input[type="number"] { width: 120px; }
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
   text-align: center;
 }
+
+/* 開発会議（DevelopmentMeeting） */
+.meeting-attendee-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 10px; }
+.meeting-attendee-card { border: 1px solid #c9c4b3; padding: 12px; background: #fdfbf5; border-top: 4px solid #758171; display: flex; flex-direction: column; gap: 8px; }
+.meeting-attendee-card.tone-positive { border-top-color: #2f6b45; background: #f4f8f0; }
+.meeting-attendee-card.tone-concern { border-top-color: #b8860b; background: #fdf8ea; }
+.meeting-attendee-card.tone-objection { border-top-color: #8c3a12; background: #fdf1ea; }
+.meeting-attendee-header { display: flex; gap: 12px; align-items: flex-start; }
+.meeting-tone-badge { margin: 2px 0 0; font-size: .78rem; font-weight: 700; }
+.meeting-tone-badge.tone-positive { color: #2f6b45; }
+.meeting-tone-badge.tone-neutral { color: #6b7264; }
+.meeting-tone-badge.tone-concern { color: #8c6a12; }
+.meeting-tone-badge.tone-objection { color: #8c3a12; }
+.meeting-attendee-comment { margin: 0; font-size: .88rem; font-style: italic; color: #354a43; line-height: 1.6; }
+
+.feature-group { margin-top: 14px; }
+.feature-group h4 { margin: 0 0 6px; font-size: .95rem; color: #354a43; border-left: 4px solid #8f9888; padding-left: 8px; }
+.feature-option-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.feature-option {
+  display: flex; align-items: flex-start; gap: 8px; border: 1px solid #d6cfbe; background: #fffdf7;
+  padding: 8px 10px; cursor: pointer;
+}
+.feature-option:has(input:checked) { border-color: #2f6b45; background: #f4f8f0; }
+.feature-option.disabled { opacity: .5; cursor: not-allowed; }
+.feature-option input { margin-top: 3px; }
+.feature-option-body { display: flex; flex-direction: column; gap: 2px; }
+.feature-option-name { font-weight: 700; font-size: .9rem; }
+.feature-option-desc { color: #4a5148; }
+.feature-option-stats { color: #758171; font-variant-numeric: tabular-nums; }
+
+.meeting-decision-actions { align-items: center; }
 
 @media (max-width: 640px) {
   .title-backdrop { padding: 8vh 12px 32px; background-position: center 20%; }

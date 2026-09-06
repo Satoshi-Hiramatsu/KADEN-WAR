@@ -4,6 +4,7 @@ import { economyRules } from '../../../packages/content/src/rules';
 import { formatBrand, formatMoney } from '../../../packages/simulation/src/money';
 import { currentDate, goalProgress, scenarioProgress } from '../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../packages/simulation/src/types';
+import { DevelopmentMeeting } from './screens/DevelopmentMeeting';
 import { Factory } from './screens/Factory';
 import { Finance } from './screens/Finance';
 import { Lab } from './screens/Lab';
@@ -313,6 +314,7 @@ function App() {
       {screen === 'office' ? <Office game={game} /> : null}
       {screen === 'meeting' ? <Meeting game={game} /> : null}
       {screen === 'lab' ? <Lab game={game} /> : null}
+      {screen === 'developmentMeeting' ? <DevelopmentMeeting game={game} /> : null}
       {screen === 'factory' ? <Factory game={game} /> : null}
       {screen === 'sales' ? <SalesOffice game={game} /> : null}
       {screen === 'finance' ? <Finance game={game} /> : null}
