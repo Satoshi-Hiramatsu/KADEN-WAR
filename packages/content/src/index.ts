@@ -4,6 +4,7 @@ export * from './technology';
 export * from './features';
 export * from './meetingCast';
 export * from './channels';
+export * from './advertising';
 export * from './rivals';
 export * from './executives';
 export * from './scenarios';

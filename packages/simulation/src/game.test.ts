@@ -5,7 +5,7 @@ import { stateHash } from './hash';
 import { balanceSheet, cashFlowStatement } from './ledger';
 import { evaluateDevelopmentMeeting } from './meeting';
 import { createGame } from './setup';
-import { advanceWeek, advanceWeeks, productionCapacityUnits } from './week';
+import { advanceWeek, advanceWeeks, productionCapacityWorkload } from './week';
 import type { GameState } from './types';
 
 function newGame(seed = 12345): GameState {
@@ -28,27 +28,27 @@ function advance(state: GameState, weeks: number): GameState {
   return result.state;
 }
 
-/** 冷蔵庫を1本発売するところまで進める共通手順。 */
+/** 真空管ラジオを1本発売するところまで進める共通手順（1950年に作れる主力商品）。 */
 function releaseFirstProduct(state: GameState): GameState {
   let current = run(state, [
-    { type: 'setResearchBudget', amount: 30 },
+    { type: 'setResearchBudget', amount: 20 },
     { type: 'setResearchTheme', themeId: 'res-efficiency-1' },
     { type: 'openChannel', channelId: 'affiliate' },
     {
       type: 'startDevelopment',
-      name: 'あかつき冷蔵庫1号',
-      categoryId: 'refrigerator',
-      moduleIds: defaultModuleIds('refrigerator'),
+      name: 'あかつきラヂオ1号',
+      categoryId: 'radio-tube',
+      moduleIds: defaultModuleIds('radio-tube'),
       qualityLevel: 1,
     },
   ]);
-  current = advance(current, 12);
+  current = advance(current, 8);
   const product = current.company.products[0];
   expect(product).toBeDefined();
   if (!product) throw new Error('製品が完成していません。');
   return run(current, [
-    { type: 'setPrice', productId: product.id, price: 62 },
-    { type: 'setProductionPlan', productId: product.id, units: 40 },
+    { type: 'setPrice', productId: product.id, price: 9000 },
+    { type: 'setProductionPlan', productId: product.id, units: 300 },
     { type: 'setOnSale', productId: product.id, onSale: true },
   ]);
 }
@@ -57,7 +57,7 @@ describe('設立と台帳', () => {
   it('開始時点で資産＝負債＋純資産が成立する', () => {
     const state = newGame();
     const balance = balanceSheet(state);
-    expect(balance.cash).toBe(10000);
+    expect(balance.cash).toBe(1200);
     expect(balance.difference).toBe(0);
   });
 
@@ -122,10 +122,10 @@ describe('生産と販売', () => {
   it('販路がなければ発売できない', () => {
     const state = newGame();
     const started = run(state, [{
-      type: 'startDevelopment', name: '試作機', categoryId: 'washer',
-      moduleIds: defaultModuleIds('washer'), qualityLevel: 0,
+      type: 'startDevelopment', name: '試作機', categoryId: 'iron',
+      moduleIds: defaultModuleIds('iron'), qualityLevel: 0,
     }]);
-    const completed = advance(started, 9);
+    const completed = advance(started, 5);
     const product = completed.company.products[0];
     if (!product) throw new Error('製品が完成していません。');
     const closed = must(applyCommand(completed, { type: 'closeChannel', channelId: 'direct' }));
@@ -137,7 +137,7 @@ describe('生産と販売', () => {
     const state = releaseFirstProduct(newGame());
     const product = state.company.products[0];
     if (!product) throw new Error('製品がありません。');
-    const capacity = productionCapacityUnits(state);
+    const capacity = productionCapacityWorkload(state);
     const result = applyCommand(state, { type: 'setProductionPlan', productId: product.id, units: capacity + 1 });
     expect(result.ok).toBe(false);
   });
@@ -146,10 +146,33 @@ describe('生産と販売', () => {
 describe('設計と研究', () => {
   it('未解禁の部品を選んだ設計は拒否される', () => {
     const evaluation = evaluateDesign({
-      categoryId: 'refrigerator',
-      moduleIds: ['mod-cool-2', 'mod-eco-1', 'mod-body-1'],
+      categoryId: 'radio-tube',
+      moduleIds: ['mod-radio-2', 'mod-eco-1', 'mod-body-1'],
       qualityLevel: 0,
-      ownedTechIds: ['tech-cooling-basic'],
+      ownedTechIds: ['tech-radio-basic'],
+    });
+    expect(evaluation.ok).toBe(false);
+  });
+
+  it('研究していない製品分類は設計できない', () => {
+    const state = newGame();
+    const evaluation = evaluateDesign({
+      categoryId: 'television',
+      moduleIds: defaultModuleIds('television'),
+      qualityLevel: 0,
+      ownedTechIds: state.company.ownedTechIds,
+      currentYear: 1955,
+    });
+    expect(evaluation.ok).toBe(false);
+  });
+
+  it('世に出ていない年の製品分類は設計できない', () => {
+    const evaluation = evaluateDesign({
+      categoryId: 'television',
+      moduleIds: defaultModuleIds('television'),
+      qualityLevel: 0,
+      ownedTechIds: ['tech-imaging-basic'],
+      currentYear: 1951,
     });
     expect(evaluation.ok).toBe(false);
   });
@@ -157,15 +180,15 @@ describe('設計と研究', () => {
   it('プレビューと開発案件の仕様が一致する（性能は会議結果の補正幅の範囲内）', () => {
     const state = newGame();
     const evaluation = evaluateDesign({
-      categoryId: 'washer',
-      moduleIds: defaultModuleIds('washer'),
+      categoryId: 'fan',
+      moduleIds: defaultModuleIds('fan'),
       qualityLevel: 2,
       ownedTechIds: state.company.ownedTechIds,
     });
     if (!evaluation.ok) throw new Error(evaluation.error);
     const started = run(state, [{
-      type: 'startDevelopment', name: '洗濯機A', categoryId: 'washer',
-      moduleIds: defaultModuleIds('washer'), qualityLevel: 2,
+      type: 'startDevelopment', name: '扇風機A', categoryId: 'fan',
+      moduleIds: defaultModuleIds('fan'), qualityLevel: 2,
     }]);
     const project = started.company.projects[0];
     if (!project) throw new Error('開発案件がありません。');
@@ -193,20 +216,21 @@ describe('設計と研究', () => {
 describe('開発会議', () => {
   it('付加価値項目は先進性・目新しさ・実用性と原価・性能に反映される', () => {
     const state = newGame();
+    const owned = [...state.company.ownedTechIds, 'tech-cooling-basic'];
     const bare = evaluateDesign({
       categoryId: 'refrigerator',
       moduleIds: defaultModuleIds('refrigerator'),
       qualityLevel: 0,
-      ownedTechIds: state.company.ownedTechIds,
-      currentYear: state.startYear + 10,
+      ownedTechIds: owned,
+      currentYear: state.startYear + 25,
     });
     const withFeatures = evaluateDesign({
       categoryId: 'refrigerator',
       moduleIds: defaultModuleIds('refrigerator'),
       qualityLevel: 0,
-      ownedTechIds: state.company.ownedTechIds,
+      ownedTechIds: owned,
       featureIds: ['feat-refr-veggie-large', 'feat-refr-door-pocket'],
-      currentYear: state.startYear + 10,
+      currentYear: state.startYear + 25,
     });
     if (!bare.ok || !withFeatures.ok) throw new Error('設計評価に失敗しました。');
     expect(withFeatures.spec.practicality).toBeGreaterThan(bare.spec.practicality);
@@ -220,9 +244,9 @@ describe('開発会議', () => {
       categoryId: 'refrigerator',
       moduleIds: defaultModuleIds('refrigerator'),
       qualityLevel: 0,
-      ownedTechIds: state.company.ownedTechIds,
+      ownedTechIds: [...state.company.ownedTechIds, 'tech-cooling-basic'],
       featureIds: ['feat-refr-app-link'], // 2008年以降の項目
-      currentYear: state.startYear,
+      currentYear: 1955,
     });
     expect(evaluation.ok).toBe(false);
   });
@@ -233,13 +257,13 @@ describe('開発会議', () => {
       categoryId: 'refrigerator',
       moduleIds: defaultModuleIds('refrigerator'),
       qualityLevel: 0,
-      ownedTechIds: state.company.ownedTechIds,
+      ownedTechIds: [...state.company.ownedTechIds, 'tech-cooling-basic'],
       featureIds: [
         'feat-refr-veggie-large', 'feat-refr-door-pocket', 'feat-refr-egg-tray',
         'feat-refr-adjust-shelf', 'feat-refr-color-variant', 'feat-refr-fingerprint',
         'feat-refr-wood-panel', 'feat-refr-reversible-door', 'feat-refr-anti-tip',
       ],
-      currentYear: state.startYear,
+      currentYear: 1990,
     });
     expect(evaluation.ok).toBe(false);
   });
@@ -247,8 +271,8 @@ describe('開発会議', () => {
   it('生産性・実用性を無視した野心的すぎる設計には反対意見が出る', () => {
     const state = newGame();
     const evaluation = evaluateDesign({
-      categoryId: 'refrigerator',
-      moduleIds: defaultModuleIds('refrigerator'),
+      categoryId: 'radio-tube',
+      moduleIds: defaultModuleIds('radio-tube'),
       qualityLevel: 3,
       ownedTechIds: state.company.ownedTechIds,
       currentYear: state.startYear,
@@ -263,7 +287,11 @@ describe('開発会議', () => {
   it('反対意見があるまま押し切ると士気が下がり、押し切らなければ着手できない', () => {
     const base = newGame();
     // 未来まで週を進め、技術不要だが原価・開発期間のかさむ付加価値項目をすべて解禁する。
-    const state: GameState = { ...base, week: 2400 };
+    const state: GameState = {
+      ...base,
+      week: 2880,
+      company: { ...base.company, ownedTechIds: [...base.company.ownedTechIds, 'tech-cooling-basic'] },
+    };
     const expensiveFeatureIds = [
       'feat-refr-stainless-premium', 'feat-refr-pullout-freezer', 'feat-refr-large-interior',
       'feat-refr-voice-notice', 'feat-refr-deodorize', 'feat-refr-outage-mode',
@@ -292,7 +320,7 @@ describe('資金不足と借入', () => {
     let state = newGame();
     state = run(state, [
       { type: 'openChannel', channelId: 'affiliate' },
-      { type: 'investEquipment', units: 10 },
+      { type: 'investEquipment', units: 3 },
     ]);
     // 現金をほぼ使い切ってから、支払えない週を作る。
     while (state.company.accounts.cash >= 60) {
@@ -317,17 +345,18 @@ describe('資金不足と借入', () => {
   it('借入枠を超える借入を拒否し、利息が残高に整合する', () => {
     const state = newGame();
     const limit = loanLimit(state);
+    expect(limit).toBe(2400);
     expect(applyCommand(state, { type: 'borrow', amount: limit + 1 }).ok).toBe(false);
-    const borrowed = must(applyCommand(state, { type: 'borrow', amount: 5000 }));
-    expect(borrowed.company.accounts.debt).toBe(5000);
-    expect(borrowed.company.accounts.cash).toBe(15000);
-    const repaid = must(applyCommand(borrowed, { type: 'repay', amount: 2000 }));
-    expect(repaid.company.accounts.debt).toBe(3000);
+    const borrowed = must(applyCommand(state, { type: 'borrow', amount: 2000 }));
+    expect(borrowed.company.accounts.debt).toBe(2000);
+    expect(borrowed.company.accounts.cash).toBe(3200);
+    const repaid = must(applyCommand(borrowed, { type: 'repay', amount: 800 }));
+    expect(repaid.company.accounts.debt).toBe(1200);
     expect(balanceSheet(repaid).difference).toBe(0);
   });
 
   it('資金不足のまま進め続けると敗北する', () => {
-    let state = run(newGame(), [{ type: 'investEquipment', units: 12 }]);
+    let state = run(newGame(), [{ type: 'borrow', amount: 2400 }, { type: 'investEquipment', units: 10 }]);
     state = run(state, [{ type: 'setResearchBudget', amount: 0 }]);
     while (state.company.accounts.cash >= 200) {
       const result = applyCommand(state, { type: 'openChannel', channelId: 'direct' });
@@ -345,17 +374,29 @@ describe('資金不足と借入', () => {
 });
 
 describe('本格経営機能（広告・人事・会議・アーカイブ）', () => {
-  it('テレビCMを打つと広告ブーストが4週間有効になり、ブランドが向上する', () => {
+  it('その年に無い媒体は使えず、新聞広告なら1950年から打てる', () => {
     let state = newGame();
     const initialBrand = state.company.brandBasis;
-    state = must(applyCommand(state, { type: 'setAdvertising', campaign: 'tv', budget: 150 }));
-    expect(state.company.advertising.activeCampaign).toBe('tv');
+    // テレビ放送が始まるのは1953年。1950年にテレビCMは打てない。
+    expect(applyCommand(state, { type: 'setAdvertising', campaign: 'tv', budget: 150 }).ok).toBe(false);
+    expect(applyCommand(state, { type: 'setAdvertising', campaign: 'radio', budget: 90 }).ok).toBe(false);
+
+    state = must(applyCommand(state, { type: 'setAdvertising', campaign: 'newspaper', budget: 60 }));
+    expect(state.company.advertising.activeCampaign).toBe('newspaper');
     expect(state.company.advertising.boostWeeksRemaining).toBe(4);
-    expect(state.company.advertising.boostBasis).toBe(3500);
+    expect(state.company.advertising.boostBasis).toBe(2000);
     expect(state.company.brandBasis).toBeGreaterThan(initialBrand);
 
     state = advance(state, 1);
     expect(state.company.advertising.boostWeeksRemaining).toBe(3);
+  });
+
+  it('1953年になればテレビCMを打てる', () => {
+    const base = newGame();
+    const state: GameState = { ...base, week: 48 * 3 };
+    const advertised = must(applyCommand(state, { type: 'setAdvertising', campaign: 'tv', budget: 150 }));
+    expect(advertised.company.advertising.activeCampaign).toBe('tv');
+    expect(advertised.company.advertising.boostBasis).toBe(3500);
   });
 
   it('人事研修と賞与で士気が向上し、不良率の低減に寄与する', () => {
@@ -366,7 +407,7 @@ describe('本格経営機能（広告・人事・会議・アーカイブ）', (
     expect(state.company.personnel.morale).toBe(85);
     expect(state.company.personnel.trainingCount).toBe(1);
 
-    state = must(applyCommand(state, { type: 'payBonus', amountPerEmployee: 5 }));
+    state = must(applyCommand(state, { type: 'payBonus', amountPerEmployee: 2 }));
     expect(state.company.personnel.morale).toBe(100);
   });
 

@@ -23,7 +23,7 @@ export function stateHash(state: GameState): string {
     accounts: company.accounts,
     brandBasis: company.brandBasis,
     employees: company.employees,
-    capacity: company.baseCapacityUnits,
+    capacity: company.baseWorkloadCapacity,
     equipmentCost: company.equipmentCost,
     equipmentUnits: company.purchasedEquipmentUnits,
     tech: [...company.ownedTechIds].sort(),

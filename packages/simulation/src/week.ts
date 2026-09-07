@@ -1,6 +1,7 @@
-import { findCategory } from '../../content/src/categories';
+import { findCategory, unitsFromWorkload, workloadForUnits } from '../../content/src/categories';
 import { findScenario } from '../../content/src/scenarios';
 import { calendarRules, economyRules, weeksPerYear } from '../../content/src/rules';
+import { bestAdCampaignAt } from '../../content/src/advertising';
 import { findHistoricalEvent } from '../../content/src/events';
 import { findResearchTheme, productionBonus, techName, researchThemes } from '../../content/src/technology';
 import { calendarLabel } from './calendar';
@@ -13,7 +14,7 @@ import {
 } from './ledger';
 import { amountFromUnits, applyBasis } from './money';
 import {
-  channelCapacityUnits,
+  channelCapacityWorkload,
   channelCommissionBasis,
   channelWeeklyCost,
   evaluateMarket,
@@ -66,8 +67,9 @@ export function mandatoryWeeklyPayment(state: GameState): Money {
   return weeklyLaborCost(state) + channelWeeklyCost(state) + weeklyInterestCost(state) + weeklyDevelopmentCost(state);
 }
 
-export function productionCapacityUnits(state: GameState): number {
-  return state.company.baseCapacityUnits + productionBonus(state.company.ownedTechIds).capacityBonus;
+/** 週あたりに投入できる生産工数。実際の台数は製品分類ごとの工数で決まる。 */
+export function productionCapacityWorkload(state: GameState): number {
+  return state.company.baseWorkloadCapacity + productionBonus(state.company.ownedTechIds).capacityBonus;
 }
 
 export function defectBasis(state: GameState): number {
@@ -170,16 +172,18 @@ function runDevelopment(state: GameState): void {
 
 function runProduction(state: GameState): { produced: number; defects: number } {
   const company = state.company;
-  let remainingCapacity = productionCapacityUnits(state);
+  let remainingWorkload = productionCapacityWorkload(state);
   let produced = 0;
   let defects = 0;
   const baseDefect = defectBasis(state);
 
   for (const product of company.products) {
-    if (product.productionPlan <= 0 || remainingCapacity <= 0) continue;
-    let units = Math.min(product.productionPlan, remainingCapacity);
+    if (product.productionPlan <= 0 || remainingWorkload <= 0) continue;
+    const category = findCategory(product.categoryId);
+    if (!category) continue;
+    let units = Math.min(product.productionPlan, unitsFromWorkload(category, remainingWorkload));
     const cash = Math.max(0, company.accounts.cash);
-    const affordable = product.unitCost > 0 ? Math.floor((cash * 10) / product.unitCost) : units;
+    const affordable = product.unitCost > 0 ? Math.floor((cash * 10000) / product.unitCost) : units;
     units = Math.min(units, affordable);
     if (units <= 0) continue;
 
@@ -195,7 +199,7 @@ function runProduction(state: GameState): { produced: number; defects: number } 
     product.stockUnits += goodUnits;
     product.stockValue += cost;
     product.totalUnitsProduced += goodUnits;
-    remainingCapacity -= units;
+    remainingWorkload -= workloadForUnits(category, units);
     produced += goodUnits;
     defects += defectUnits;
   }
@@ -214,7 +218,7 @@ function runSales(state: GameState): SalesResult {
   const evaluation = evaluateMarket(state, { withNoise: true });
   state.rng = evaluation.rng;
 
-  let remainingChannelCapacity = channelCapacityUnits(state);
+  let remainingChannelWorkload = channelCapacityWorkload(state);
   const commissionBasis = channelCommissionBasis(state);
   let unitsSold = 0;
   let revenue = 0;
@@ -232,7 +236,10 @@ function runSales(state: GameState): SalesResult {
       if (entry.owner !== 'player') continue;
       const product = company.products.find(candidate => candidate.id === entry.id);
       if (!product) continue;
-      const units = Math.min(entry.unitsDemanded, product.stockUnits, remainingChannelCapacity);
+      const category = findCategory(product.categoryId);
+      if (!category) continue;
+      const sellable = unitsFromWorkload(category, remainingChannelWorkload);
+      const units = Math.min(entry.unitsDemanded, product.stockUnits, sellable);
       product.lastWeekShareBasis = entry.shareBasis;
       if (units <= 0) continue;
 
@@ -251,7 +258,7 @@ function runSales(state: GameState): SalesResult {
       product.totalRevenue += productRevenue;
       product.lastWeekUnitsSold = units;
 
-      remainingChannelCapacity -= units;
+      remainingChannelWorkload -= workloadForUnits(category, units);
       unitsSold += units;
       ownUnits += units;
       revenue += productRevenue;
@@ -304,7 +311,9 @@ function updateBrand(state: GameState, shares: WeeklyReport['categoryShares']): 
   const shareBasis = demandUnits > 0 ? Math.floor((ownUnits * 10000) / demandUnits) : 0;
   const premium = company.products.some(product => product.onSale && product.performance >= 130) ? 1 : 0;
   const noveltyPremium = company.products.some(product => product.onSale && product.novelty >= 30) ? 1 : 0;
-  const gain = Math.floor(shareBasis / 120) + premium + noveltyPremium;
+  // 知名度は上に行くほど伸びにくい。占有率だけで青天井にならないようにする。
+  const rawGain = Math.floor(shareBasis / 300) + premium + noveltyPremium;
+  const gain = Math.floor((rawGain * (10000 - company.brandBasis)) / 10000);
   const next = company.brandBasis + gain - economyRules.brandDecayBasis;
   company.brandBasis = Math.max(0, Math.min(10000, next));
 }
@@ -376,13 +385,15 @@ export function refreshMeetingProposals(state: GameState): void {
 
   // 2. 販売統括
   if (company.advertising.boostWeeksRemaining <= 0) {
+    const adYear = state.startYear + Math.floor(state.week / weeksPerYear);
+    const campaign = bestAdCampaignAt(adYear);
     proposals.push({
       id: `prop-sales-${state.week}`,
       executiveId: 'sales',
-      title: 'テレビCM放映キャンペーンの実施',
-      description: 'お茶の間の認知度を一気に高め、ライバルからシェアを奪取する全国CMを打ちましょう！',
-      cost: 150,
-      expectedEffect: '4週間にわたり全製品の市場需要+35%、ブランド向上',
+      title: `${campaign.name}キャンペーンの実施`,
+      description: campaign.pitch,
+      cost: campaign.cost,
+      expectedEffect: `4週間にわたり全製品の市場需要+${Math.round(campaign.boostBasis / 100)}%、ブランド向上`,
       accepted: false,
     });
   } else {
@@ -392,7 +403,7 @@ export function refreshMeetingProposals(state: GameState): void {
       title: '系列販売店の新規開拓',
       description: '地域に根ざした系列店との契約を増やし、安定した販売基盤を固めるべきです。',
       cost: 80,
-      expectedEffect: '販売能力+18台/週、販路維持',
+      expectedEffect: '販売能力+1,600工数/週（系列店1店ぶん）、販路維持',
       accepted: false,
     });
   }
@@ -405,7 +416,7 @@ export function refreshMeetingProposals(state: GameState): void {
       title: '最新鋭工作機械の導入（設備増設）',
       description: '工場のラインを増強し、週あたり生産能力を拡大して品切れを防ぎます。',
       cost: 300,
-      expectedEffect: '週の生産能力+25台（設備1口増設）',
+      expectedEffect: `週の生産能力+${economyRules.equipmentUnitCapacity}工数（設備1口増設）`,
       accepted: false,
     });
   } else {
@@ -460,25 +471,32 @@ export function refreshMeetingProposals(state: GameState): void {
 export function simulateRivalActions(state: GameState): void {
   const week = state.week;
   if (week % 4 !== 0 || week === 0) return;
+  const year = state.startYear + Math.floor(week / weeksPerYear);
   const rivalIndex = Math.floor(week / 4) % 3;
   const candidates: { id: string; name: string; action: string; cat: CategoryId }[] = [
     {
       id: 'rival-kowa',
       name: '光和電機',
-      action: '大迫社長の号令により、主力製品の大幅な値下げ攻勢を宣言！価格競争が激化しています。',
-      cat: 'refrigerator',
+      action: year >= 1956
+        ? '大迫社長の号令により、乾電池と電球の大幅な値下げ攻勢を宣言！価格競争が激化しています。'
+        : '大迫社長が問屋筋を回り、乾電池の大量供給と安値攻勢を仕掛けています。',
+      cat: 'battery-dry',
     },
     {
       id: 'rival-hinode',
       name: '日之出工業',
-      action: '神崎社長が記者会見を開き、独自開発の新技術を投入した高級フラッグシップ機を発表！',
-      cat: 'television',
+      action: year >= 1953
+        ? '神崎社長が記者会見を開き、自社開発の受像機を発表！テレビ市場で先行すると宣言しています。'
+        : '神崎社長が記者会見を開き、高級五球スーパーの新型ラジオを発表しました。',
+      cat: year >= 1953 ? 'television' : 'radio-tube',
     },
     {
       id: 'rival-mine',
       name: '三嶺電器',
-      action: '島村社長が全国特約店との結束を強化し、地域密着の販促キャンペーンを展開。',
-      cat: 'washer',
+      action: year >= 1954
+        ? '島村社長が全国特約店との結束を強化し、洗濯機の実演販売を各地で展開しています。'
+        : '島村社長が全国特約店との結束を強化し、地域密着の販促キャンペーンを展開。',
+      cat: year >= 1954 ? 'washer' : 'fan',
     },
   ];
   const chosen = candidates[rivalIndex]!;
@@ -509,6 +527,18 @@ export function checkHistoricalEvents(state: GameState): void {
     });
     addLog(state, event.impactType === 'boom' ? 'good' : 'bad', `【業界速報】${event.title}：${event.headline}`);
   }
+}
+
+/**
+ * 殿堂入りの格付け。乾電池は何万本、テレビは数十台と台数の桁が違うため、
+ * 生涯売上（万円）で評価する。
+ */
+export function productRank(totalRevenue: Money): 'S' | 'A' | 'B' | 'C' | 'D' {
+  if (totalRevenue >= 20000) return 'S';
+  if (totalRevenue >= 8000) return 'A';
+  if (totalRevenue >= 3000) return 'B';
+  if (totalRevenue >= 800) return 'C';
+  return 'D';
 }
 
 function updateArchiveAndMorale(state: GameState, netIncome: Money): void {
@@ -551,9 +581,7 @@ function updateArchiveAndMorale(state: GameState, netIncome: Money): void {
       if (product.lastWeekShareBasis > archived.peakShareBasis) {
         archived.peakShareBasis = product.lastWeekShareBasis;
       }
-      if (archived.totalUnitsSold >= 2000) archived.rank = 'S';
-      else if (archived.totalUnitsSold >= 1000) archived.rank = 'A';
-      else if (archived.totalUnitsSold >= 500) archived.rank = 'B';
+      archived.rank = productRank(archived.totalRevenue);
     }
   }
 }

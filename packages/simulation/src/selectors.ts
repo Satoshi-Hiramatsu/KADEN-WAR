@@ -1,20 +1,21 @@
+import { findCategory, unitsFromWorkload, workloadForUnits } from '../../content/src/categories';
 import { executives, type ExecutiveId } from '../../content/src/executives';
 import { economyRules } from '../../content/src/rules';
 import { findResearchTheme } from '../../content/src/technology';
 import { calendarAt, formatCalendar } from './calendar';
 import { balanceSheet, cashFlowStatement, incomeStatement } from './ledger';
-import { formatBrand, formatMoney, formatThousandYen } from './money';
-import { channelCapacityUnits, channelWeeklyCost, evaluateMarket } from './market';
+import { formatBrand, formatMoney, formatUnitPrice, formatUnits } from './money';
+import { channelCapacityWorkload, channelWeeklyCost, evaluateMarket } from './market';
 import { scenarioOf } from './setup';
 import {
   defectBasis,
   mandatoryWeeklyPayment,
-  productionCapacityUnits,
+  productionCapacityWorkload,
   weeklyDevelopmentCost,
   weeklyInterestCost,
   weeklyLaborCost,
 } from './week';
-import type { GameState, Money, ScenarioProgress } from './types';
+import type { GameState, Money, Product, ScenarioProgress } from './types';
 
 export type ReportMetric = { label: string; value: string; note?: string };
 
@@ -96,6 +97,32 @@ export function plannedProductionUnits(state: GameState): number {
   return state.company.products.reduce((sum, product) => sum + product.productionPlan, 0);
 }
 
+/** 生産計画が使っている工数の合計。 */
+export function plannedProductionWorkload(state: GameState): number {
+  let total = 0;
+  for (const product of state.company.products) {
+    const category = findCategory(product.categoryId);
+    if (category) total += workloadForUnits(category, product.productionPlan);
+  }
+  return total;
+}
+
+/** その製品にあと何台まで計画を増やせるか（他製品の計画を差し引いた残り工数から求める）。 */
+export function maxProductionUnitsFor(state: GameState, product: Product): number {
+  const category = findCategory(product.categoryId);
+  if (!category) return 0;
+  const others = plannedProductionWorkload(state) - workloadForUnits(category, product.productionPlan);
+  const remaining = productionCapacityWorkload(state) - Math.max(0, others);
+  return Math.max(0, unitsFromWorkload(category, remaining));
+}
+
+/** 1週間ぶんの販売能力を、その製品分類の台数に直した目安。 */
+export function channelCapacityUnitsFor(state: GameState, categoryId: string): number {
+  const category = findCategory(categoryId);
+  if (!category) return 0;
+  return unitsFromWorkload(category, channelCapacityWorkload(state));
+}
+
 export function lastWeekUnitsSold(state: GameState): number {
   return state.lastWeek?.unitsSold ?? 0;
 }
@@ -117,9 +144,9 @@ export function departmentReports(state: GameState): DepartmentReport[] {
   const company = state.company;
   const balance = balanceSheet(state);
   const monthly = incomeStatement(state.monthTotals);
-  const capacity = productionCapacityUnits(state);
-  const planned = plannedProductionUnits(state);
-  const channelCapacity = channelCapacityUnits(state);
+  const capacity = productionCapacityWorkload(state);
+  const planned = plannedProductionWorkload(state);
+  const channelCapacity = channelCapacityWorkload(state);
   const cashWeeks = weeksOfCashRemaining(state);
   const progress = scenarioProgress(state);
 
@@ -163,14 +190,14 @@ export function departmentReports(state: GameState): DepartmentReport[] {
         const onSale = company.products.filter(product => product.onSale);
         headline = onSale.length === 0
           ? '発売中の製品がありません。価格と販路を決めて発売してください。'
-          : `先週は${lastWeekUnitsSold(state)}台売れました。販路の余力は週${channelCapacity}台です。`;
+          : `先週は${formatUnits(lastWeekUnitsSold(state))}台売れました。販路の能力は週${formatUnits(channelCapacity)}工数です。`;
         metrics.push(
-          { label: '販売能力', value: `${channelCapacity}台/週` },
+          { label: '販売能力', value: `${formatUnits(channelCapacity)}工数/週` },
           { label: '直営店', value: `${company.channels.direct}店` },
           { label: '系列店', value: `${company.channels.affiliate}件` },
-          { label: '在庫', value: `${inventoryUnits(state)}台` },
+          { label: '在庫', value: `${formatUnits(inventoryUnits(state))}台` },
         );
-        if (onSale.length > 0 && channelCapacity < lastWeekUnitsSold(state) + 1) {
+        if (onSale.length > 0 && channelCapacity <= plannedProductionWorkload(state)) {
           warnings.push('販路の能力が上限に近づいています。販路を増やすと売り逃しを減らせます。');
         }
         break;
@@ -193,12 +220,12 @@ export function departmentReports(state: GameState): DepartmentReport[] {
       }
       case 'production': {
         headline = planned === 0
-          ? '生産計画が0台です。工場で週の生産量を決めてください。'
-          : `週${planned}台の計画です。能力は${capacity}台/週、不良率は約${(defectBasis(state) / 100).toFixed(1)}%です。`;
+          ? '生産計画が空です。工場で週の生産量を決めてください。'
+          : `週${formatUnits(plannedProductionUnits(state))}台（${formatUnits(planned)}工数）の計画です。能力は${formatUnits(capacity)}工数/週、不良率は約${(defectBasis(state) / 100).toFixed(1)}%です。`;
         metrics.push(
-          { label: '生産能力', value: `${capacity}台/週` },
-          { label: '生産計画', value: `${planned}台/週` },
-          { label: '在庫', value: `${inventoryUnits(state)}台` },
+          { label: '生産能力', value: `${formatUnits(capacity)}工数/週` },
+          { label: '生産計画', value: `${formatUnits(planned)}工数/週` },
+          { label: '在庫', value: `${formatUnits(inventoryUnits(state))}台` },
           { label: '在庫評価額', value: formatMoney(balance.inventory) },
         );
         if (planned > capacity) warnings.push('計画が生産能力を超えています。');
@@ -249,5 +276,5 @@ export function marketForecast(state: GameState) {
 
 export function averageUnitCost(stockUnits: number, stockValue: Money): string {
   if (stockUnits <= 0) return '—';
-  return formatThousandYen(Math.round((stockValue * 10) / stockUnits));
+  return formatUnitPrice(Math.round((stockValue * 10000) / stockUnits));
 }

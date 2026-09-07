@@ -1,7 +1,7 @@
 import { categories, demandUnitsAt, findCategory, type CategoryId } from '../../content/src/categories';
 import { channels, findChannel } from '../../content/src/channels';
-import { rivals } from '../../content/src/rivals';
-import { economyRules } from '../../content/src/rules';
+import { rivals, rivalJoinsSegment } from '../../content/src/rivals';
+import { calendarRules, economyRules, weeksPerYear } from '../../content/src/rules';
 import { nextInt } from './rng';
 import type { GameState, Product } from './types';
 
@@ -41,7 +41,8 @@ export function channelReachBasis(state: GameState): number {
   return Math.floor(weighted / capacity);
 }
 
-export function channelCapacityUnits(state: GameState): number {
+/** 販路が1週間にさばける販売工数。台数は製品分類ごとの工数から決まる。 */
+export function channelCapacityWorkload(state: GameState): number {
   let capacity = 0;
   for (const channel of channels) capacity += state.company.channels[channel.id] * channel.capacityPerUnit;
   return capacity;
@@ -89,13 +90,14 @@ function brandFactor(brandBasis: number): number {
  * 同じ入力からは常に同じ配分になるようにする。
  */
 export function evaluateMarket(state: GameState, options: { withNoise: boolean }): MarketEvaluation {
-  const year = state.startYear + Math.floor(state.week / 48);
+  const year = state.startYear + Math.floor(state.week / weeksPerYear);
   const reach = channelReachBasis(state) / 10000;
   let rng = state.rng;
   const markets: CategoryMarket[] = [];
 
   for (const category of categories) {
     const demandUnits = demandUnitsAt(category, year);
+    if (demandUnits <= 0) continue;
     const entries: MarketEntry[] = [];
 
     for (const product of state.company.products) {
@@ -128,13 +130,13 @@ export function evaluateMarket(state: GameState, options: { withNoise: boolean }
     }
 
     for (const rival of rivals) {
-      if (!rival.categoryIds.includes(category.id)) continue;
-      const years = year - 1960;
+      if (!rivalJoinsSegment(rival, category.segment)) continue;
+      const years = year - calendarRules.startYear;
       const performance = rival.basePerformance + rival.performanceGrowthPerYear * years;
       const price = Math.max(1, Math.floor((category.referencePrice * rival.priceBasis) / 10000));
       const priceRatio = category.referencePrice / price;
       let attractiveness = (performance / category.basePerformance) * priceRatio * priceRatio
-        * brandFactor(rival.brand * 100);
+        * brandFactor(Math.min(10000, (rival.brand + rival.brandGrowthPerYear * years) * 100));
       if (options.withNoise) {
         const drawn = nextInt(rng, 9700, 10300);
         rng = drawn.state;

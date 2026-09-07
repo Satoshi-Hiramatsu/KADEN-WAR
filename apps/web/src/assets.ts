@@ -129,6 +129,20 @@ import mob2010Smartphone from '../../../assets/products/mob-2010-smartphone-v1.p
 import vtr1970Topload from '../../../assets/products/vtr-1970-topload-v1.png';
 import vtr1980HifiDeck from '../../../assets/products/vtr-1980-hifi-deck-v1.png';
 
+import batt1950DryCell from '../../../assets/products/batt-1950-dry-cell-v1.png';
+import wire1950SwitchOutlet from '../../../assets/products/wire-1950-switch-outlet-v1.png';
+import xfmr1950Power from '../../../assets/products/xfmr-1950-power-v1.png';
+import torch1950Flashlight from '../../../assets/products/torch-1950-flashlight-v1.png';
+
+import bulb1950Incandescent from '../../../assets/products/bulb-1950-incandescent-v1.png';
+import lamp1953Fluorescent from '../../../assets/products/lamp-1953-fluorescent-v1.png';
+import lamp1952Desk from '../../../assets/products/lamp-1952-desk-v1.png';
+
+import toy1950Tin from '../../../assets/products/toy-1950-tin-v1.png';
+import toy1955Motor from '../../../assets/products/toy-1955-motor-v1.png';
+import toy1958PlasticModel from '../../../assets/products/toy-1958-plastic-model-v1.png';
+import toy1956ModelRailway from '../../../assets/products/toy-1956-model-railway-v1.png';
+
 // ==========================================
 // 役員ポートレート判定
 // ==========================================
@@ -296,7 +310,7 @@ export type SceneKey =
 
 export function getSceneBackgroundUrl(sceneKey: SceneKey, game?: GameState): string {
   const isCashCritical = game ? (game.company.accounts.cash <= 200 || game.company.graceWeeks > 0) : false;
-  const currentYear = game ? game.startYear + Math.floor(game.week / 48) : 1960;
+  const currentYear = game ? game.startYear + Math.floor(game.week / 48) : 1950;
 
   switch (sceneKey) {
     case 'office':
@@ -363,15 +377,22 @@ export function getSceneBackgroundUrl(sceneKey: SceneKey, game?: GameState): str
 // ==========================================
 // 家電製品スプライト判定
 // ==========================================
-export function getProductSpriteUrl(categoryId: string, year: number = 1960): string {
+export function getProductSpriteUrl(categoryId: string, year: number = 1950): string | null {
   const cat = categoryId.toLowerCase();
 
-  // テレビ
+  // 白黒テレビ
   if (cat === 'television' || cat === 'tv') {
     if (year >= 2000) return tv2000FlatLcd;
     if (year >= 1980) return tv1980CrtHifi;
     if (year >= 1970) return tv1970ColorConsole;
     return tv1960BlackWhite;
+  }
+
+  // カラーテレビ
+  if (cat === 'television-color') {
+    if (year >= 2000) return tv2000FlatLcd;
+    if (year >= 1980) return tv1980CrtHifi;
+    return tv1970ColorConsole;
   }
 
   // 洗濯機
@@ -390,8 +411,8 @@ export function getProductSpriteUrl(categoryId: string, year: number = 1960): st
     return refr19601Door;
   }
 
-  // オーディオ・ラジオ
-  if (cat.includes('audio') || cat.includes('radio') || cat.includes('sound')) {
+  // ラジオ・音響
+  if (cat.startsWith('radio') || cat.includes('audio') || cat.includes('sound')) {
     if (year >= 1990) return audio1990PortableCd;
     if (year >= 1985) return audio1980Walkman;
     if (year >= 1980) return audio1980Minicompo;
@@ -405,19 +426,19 @@ export function getProductSpriteUrl(categoryId: string, year: number = 1960): st
   }
 
   // 調理家電（レンジ・炊飯器）
-  if (cat.includes('cook') || cat.includes('microwave') || cat.includes('rice')) {
+  if (cat.includes('microwave') || cat.includes('rice')) {
     if (year >= 1980) return cook1980Ricecooker;
     return cook1970Microwave;
   }
 
   // 掃除機
-  if (cat.includes('clean') || cat.includes('vacuum') || cat.includes('robot')) {
+  if (cat === 'vacuum' || cat.includes('robot')) {
     if (year >= 2005) return clean2010Robot;
     return clean1970Vacuum;
   }
 
   // パソコン
-  if (cat.includes('pc') || cat.includes('computer')) {
+  if (cat.startsWith('pc') || cat.includes('computer')) {
     if (year >= 1995) return pc1990Laptop;
     if (year >= 1990) return pc199016BitDesktop;
     return pc19808BitHobby;
@@ -436,5 +457,24 @@ export function getProductSpriteUrl(categoryId: string, year: number = 1960): st
     return vtr1970Topload;
   }
 
-  return tv1960BlackWhite;
+  // 乾電池・配線器具・電源トランス
+  if (cat === 'battery-dry') return batt1950DryCell;
+  if (cat === 'wiring-device') return wire1950SwitchOutlet;
+  if (cat === 'transformer') return xfmr1950Power;
+  if (cat === 'flashlight') return torch1950Flashlight;
+
+  // 照明
+  if (cat === 'bulb-incandescent') return bulb1950Incandescent;
+  if (cat === 'lamp-fluorescent') return lamp1953Fluorescent;
+  if (cat === 'desk-lamp') return lamp1952Desk;
+
+  // 玩具
+  if (cat === 'toy-tin') return toy1950Tin;
+  if (cat === 'toy-motor') return toy1955Motor;
+  if (cat === 'toy-plastic-model') return toy1958PlasticModel;
+  if (cat === 'toy-model-railway') return toy1956ModelRailway;
+
+  // それ以外はまだ専用の原画を用意していない。
+  // 実在しない画像を当てず、呼び出し側で文字の代替表示に切り替える。
+  return null;
 }

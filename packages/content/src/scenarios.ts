@@ -19,7 +19,8 @@ export type ScenarioDefinition = {
   initialDebt: number;
   initialBrandBasis: number;
   initialEmployees: number;
-  initialCapacityUnits: number;
+  /** 開始時の生産能力（工数/週）。 */
+  initialWorkloadCapacity: number;
   initialEquipmentCost: number;
   initialTechIds: readonly string[];
   initialChannels: { direct: number; affiliate: number };
@@ -31,26 +32,34 @@ export type ScenarioDefinition = {
 export const scenarios: readonly ScenarioDefinition[] = [
   {
     id: 'SC01',
-    name: '暮らしの電化',
-    subtitle: '1960年1月〜1964年12月 / 240週',
-    startYear: 1960,
-    durationWeeks: weeksPerYear * 5,
-    initialCash: 10000,
-    initialCapital: 10000,
+    name: '電化のあけぼの',
+    subtitle: '1950年1月〜1959年12月 / 480週',
+    startYear: 1950,
+    durationWeeks: weeksPerYear * 10,
+    initialCash: 1200,
+    initialCapital: 1200,
     initialDebt: 0,
     initialBrandBasis: 1000,
     initialEmployees: 40,
-    initialCapacityUnits: 40,
+    initialWorkloadCapacity: 1600,
     initialEquipmentCost: 0,
-    initialTechIds: ['tech-cooling-basic', 'tech-washing-basic', 'tech-imaging-basic'],
+    initialTechIds: [
+      'tech-battery-basic',
+      'tech-lamp-basic',
+      'tech-wiring-basic',
+      'tech-radio-basic',
+      'tech-heater-basic',
+      'tech-motor-basic',
+      'tech-toy-basic',
+    ],
     initialChannels: { direct: 1, affiliate: 0 },
-    goal: { cumulativeRevenue: 30000, cumulativeProfit: 3000, brandBasis: 3000 },
+    goal: { cumulativeRevenue: 150000, cumulativeProfit: 15000, brandBasis: 3000 },
     briefing:
-      '町工場から始まった電機会社を、家庭に家電が入り始めた時代に育てる。5年で売上30,000万円・累計利益3,000万円・ブランド30.00を達成すれば成功。資金が尽きれば敗北。',
+      '昭和25年。まだテレビも冷蔵庫もない家庭に、乾電池と電球とラジオを届ける町工場から始める。10年で累計売上150,000万円・累計利益15,000万円・ブランド30.00を達成すれば成功。資金が尽きれば敗北。',
     guidance: [
-      '研究所で研究予算を決め、冷蔵庫か洗濯機を設計して開発を始める。',
-      '開発が終わったら工場で週の生産量を、販売本部で価格と販路を決める。',
-      '発売すると週送りのたびに売れる。経理部で資金と損益を確認する。',
+      'はじめは乾電池・電球・配線器具・ブリキ玩具のような小物で現金を作る。数が出るぶん工場が回る。',
+      '真空管ラジオはこの時代の主力商品。研究所で五球スーパーを開発すれば単価の高い上級機が作れる。',
+      '洗濯機・冷蔵庫・テレビは研究しなければ設計できない。史実どおり1953年前後から順に世に出る。',
     ],
   },
 ];

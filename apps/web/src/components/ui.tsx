@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { findCategory } from '../../../../packages/content/src/categories';
 import { findExecutive, type ExecutiveId } from '../../../../packages/content/src/executives';
 import { findMeetingCast, type MeetingCastId } from '../../../../packages/content/src/meetingCast';
 import type { DepartmentReport } from '../../../../packages/simulation/src/selectors';
@@ -80,7 +81,7 @@ export function MeetingCastPortrait({ id, size = 72 }: { id: MeetingCastId; size
 
 export function ProductSprite({
   categoryId,
-  year = 1960,
+  year = 1950,
   size = 'md',
   alt = '',
 }: {
@@ -90,6 +91,20 @@ export function ProductSprite({
   alt?: string;
 }) {
   const src = getProductSpriteUrl(categoryId, year);
+  // 原画のない分類（乾電池・照明・玩具など）は、別製品の絵を流用せず分類名の略号で示す。
+  if (src === null) {
+    const category = findCategory(categoryId);
+    return (
+      <span
+        className={`product-sprite size-${size} product-sprite-fallback`}
+        role="img"
+        aria-label={alt || category?.name || categoryId}
+        title={category?.name ?? categoryId}
+      >
+        {category?.shortName ?? '？'}
+      </span>
+    );
+  }
   return (
     <img
       src={src}

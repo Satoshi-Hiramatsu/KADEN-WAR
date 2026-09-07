@@ -1,10 +1,12 @@
-import { findCategory } from '../../../../packages/content/src/categories';
+import { findCategory, unitsFromWorkload } from '../../../../packages/content/src/categories';
+import { weeksPerYear } from '../../../../packages/content/src/rules';
 import { findExecutive } from '../../../../packages/content/src/executives';
 import { maxSelectableFeatures, unlockedFeaturesFor } from '../../../../packages/content/src/features';
 import { findMeetingCast, type MeetingCastId } from '../../../../packages/content/src/meetingCast';
-import { evaluateDesign } from '../../../../packages/simulation/src/design';
+import { evaluateDesign, featureDevCostFor, featureUnitCostFor } from '../../../../packages/simulation/src/design';
 import { evaluateDevelopmentMeeting, type MeetingAttendeeId, type MeetingTone } from '../../../../packages/simulation/src/meeting';
-import { formatMoney, formatThousandYen } from '../../../../packages/simulation/src/money';
+import { productionCapacityWorkload } from '../../../../packages/simulation/src/week';
+import { formatMoney, formatUnitPrice, formatUnits } from '../../../../packages/simulation/src/money';
 import type { GameState } from '../../../../packages/simulation/src/types';
 import type { ExecutiveExpression } from '../assets';
 import {
@@ -77,7 +79,7 @@ export function DevelopmentMeeting({ game }: { game: GameState }) {
     );
   }
 
-  const currentYear = game.startYear + Math.floor(game.week / 48);
+  const currentYear = game.startYear + Math.floor(game.week / weeksPerYear);
   const owned = game.company.ownedTechIds;
   const category = findCategory(draft.categoryId);
   const features = unlockedFeaturesFor(draft.categoryId, currentYear, owned);
@@ -170,10 +172,10 @@ export function DevelopmentMeeting({ game }: { game: GameState }) {
                 metrics={[
                   { label: '性能', value: `${evaluation.spec.performance}` },
                   { label: '消費電力', value: `${evaluation.spec.energy}`, note: '100が標準' },
-                  { label: '製造原価', value: formatThousandYen(evaluation.spec.unitCost) },
+                  { label: '製造原価', value: formatUnitPrice(evaluation.spec.unitCost) },
                   { label: '開発期間', value: `${evaluation.spec.devWeeks}週` },
                   { label: '開発費', value: formatMoney(evaluation.spec.devCost) },
-                  { label: '推奨価格', value: formatThousandYen(evaluation.spec.suggestedPrice) },
+                  { label: '推奨価格', value: formatUnitPrice(evaluation.spec.suggestedPrice) },
                   { label: '先進性', value: `${evaluation.spec.advancement}` },
                   { label: '目新しさ', value: `${evaluation.spec.novelty}` },
                   { label: '実用性', value: `${evaluation.spec.practicality}` },
@@ -184,8 +186,10 @@ export function DevelopmentMeeting({ game }: { game: GameState }) {
             )}
             {category ? (
               <small>
-                参考：{category.name}の標準原価{formatThousandYen(category.baseUnitCost)}
-                ／標準開発期間{category.baseDevWeeks}週。会議の結果次第で、完成品の性能には最終的にプラスマイナスの補正がかかります。
+                参考：{category.name}の標準原価{formatUnitPrice(category.baseUnitCost)}
+                ／標準開発期間{category.baseDevWeeks}週／100台あたり{category.workloadPer100Units}工数
+                （いまの工場なら週{formatUnits(unitsFromWorkload(category, productionCapacityWorkload(game)))}台まで）。
+                会議の結果次第で、完成品の性能には最終的にプラスマイナスの補正がかかります。
               </small>
             ) : null}
           </Panel>
@@ -243,8 +247,10 @@ export function DevelopmentMeeting({ game }: { game: GameState }) {
                             <small className="feature-option-desc">{feature.description}</small>
                             <small className="feature-option-stats">
                               性能{feature.performance >= 0 ? '+' : ''}{feature.performance} /
-                              原価{feature.unitCost >= 0 ? '+' : ''}{feature.unitCost} /
-                              開発{feature.devWeeks >= 0 ? '+' : ''}{feature.devWeeks}週 /
+                              原価{featureUnitCostFor(draft.categoryId, feature) >= 0 ? '+' : ''}
+                              {formatUnitPrice(featureUnitCostFor(draft.categoryId, feature))} /
+                              開発{feature.devWeeks >= 0 ? '+' : ''}{feature.devWeeks}週
+                              （{formatMoney(featureDevCostFor(draft.categoryId, feature))}） /
                               先進性{feature.advancement >= 0 ? '+' : ''}{feature.advancement} /
                               目新{feature.novelty >= 0 ? '+' : ''}{feature.novelty} /
                               実用{feature.practicality >= 0 ? '+' : ''}{feature.practicality}

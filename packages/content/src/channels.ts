@@ -3,7 +3,10 @@ export type ChannelId = 'direct' | 'affiliate';
 export type ChannelDefinition = {
   id: ChannelId;
   name: string;
-  /** 1拠点あたりの週次販売能力（台）。 */
+  /**
+   * 1拠点あたりの週次販売能力（工数）。
+   * 生産と同じ尺度で数えるため、乾電池なら何万本、テレビなら数十台に相当する。
+   */
   capacityPerUnit: number;
   /** 1拠点あたりの週次維持費（万円）。 */
   weeklyCost: number;
@@ -21,9 +24,9 @@ export const channels: readonly ChannelDefinition[] = [
   {
     id: 'direct',
     name: '直営店',
-    capacityPerUnit: 26,
-    weeklyCost: 14,
-    openCost: 300,
+    capacityPerUnit: 800,
+    weeklyCost: 6,
+    openCost: 120,
     commissionBasis: 0,
     reachBasis: 8600,
     maxUnits: 6,
@@ -32,13 +35,13 @@ export const channels: readonly ChannelDefinition[] = [
   {
     id: 'affiliate',
     name: '系列店',
-    capacityPerUnit: 58,
-    weeklyCost: 7,
-    openCost: 200,
+    capacityPerUnit: 1600,
+    weeklyCost: 3,
+    openCost: 60,
     commissionBasis: 900,
     reachBasis: 10200,
     maxUnits: 6,
-    description: '地域の販売店と契約する。台数は伸びるが手数料を払う。',
+    description: '街の電器店と特約を結ぶ。数はさばけるが手数料を払う。',
   },
 ];
 

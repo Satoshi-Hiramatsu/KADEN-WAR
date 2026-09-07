@@ -215,6 +215,7 @@ input[type="number"] { width: 120px; }
 .ad-active-box p { margin: 2px 0 0; font-size: .88rem; }
 .ad-campaign-options { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 10px; }
 .ad-card { border: 1px solid #c9c4b3; padding: 14px; background: #fffcf4; border-top: 3px solid #758171; display: flex; flex-direction: column; gap: 6px; }
+.ad-card.locked { opacity: .55; border-top-color: #b9b3a2; }
 .ad-card h4 { margin: 0; font-size: .98rem; }
 .ad-card p { margin: 2px 0; font-size: .84rem; }
 .ad-card p.spec { font-size: .8rem; color: #2f6b45; font-weight: 700; margin-top: auto; padding-top: 6px; }
@@ -338,6 +339,24 @@ input[type="number"] { width: 120px; }
 .product-sprite.size-md { width: 56px; height: 56px; }
 .product-sprite.size-lg { width: 88px; height: 88px; }
 .product-sprite.size-hero { width: 140px; height: 140px; }
+
+/* 原画のない製品分類は、他製品の絵を流用せず略号の札で示す。 */
+.product-sprite-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #4d5b48 0%, #33402f 100%);
+  color: #f2f5ea;
+  border: 2px solid #8e998a;
+  border-radius: 4px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.product-sprite-fallback.size-sm { font-size: 18px; }
+.product-sprite-fallback.size-md { font-size: 26px; }
+.product-sprite-fallback.size-lg { font-size: 40px; }
+.product-sprite-fallback.size-hero { font-size: 64px; }
 
 .product-pedestal {
   background: radial-gradient(circle, #fcf8ee 0%, #e2dac4 100%);

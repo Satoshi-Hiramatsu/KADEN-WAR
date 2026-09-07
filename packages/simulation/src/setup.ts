@@ -6,7 +6,7 @@ import { seedRng } from './rng';
 import { refreshMeetingProposals } from './week';
 import type { GameState } from './types';
 
-export const engineVersion = '0.3.0';
+export const engineVersion = '0.4.0';
 
 export type NewGameOptions = {
   scenarioId: string;
@@ -38,7 +38,7 @@ export function createGame(options: NewGameOptions): GameState {
       accounts: createAccounts(),
       brandBasis: scenario.initialBrandBasis,
       employees: scenario.initialEmployees,
-      baseCapacityUnits: scenario.initialCapacityUnits,
+      baseWorkloadCapacity: scenario.initialWorkloadCapacity,
       equipmentCost: scenario.initialEquipmentCost,
       purchasedEquipmentUnits: 0,
       ownedTechIds: [...scenario.initialTechIds],

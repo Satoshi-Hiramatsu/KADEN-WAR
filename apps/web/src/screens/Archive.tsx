@@ -1,5 +1,6 @@
 import { findCategory } from '../../../../packages/content/src/categories';
-import { formatBasisAsPercent, formatMoney, formatThousandYen } from '../../../../packages/simulation/src/money';
+import { weeksPerYear } from '../../../../packages/content/src/rules';
+import { formatBasisAsPercent, formatMoney, formatUnitPrice } from '../../../../packages/simulation/src/money';
 import type { GameState } from '../../../../packages/simulation/src/types';
 import { Panel, SceneBanner, ProductSprite } from '../components/ui';
 import { IconTrophy } from '../components/icons';
@@ -7,7 +8,7 @@ import { IconTrophy } from '../components/icons';
 export function Archive({ game }: { game: GameState }) {
   const archive = game.company.archive ?? [];
   const currentProducts = game.company.products;
-  const currentYear = game.startYear + Math.floor(game.week / 48);
+  const currentYear = game.startYear + Math.floor(game.week / weeksPerYear);
 
   return (
     <>
@@ -45,7 +46,7 @@ export function Archive({ game }: { game: GameState }) {
                   <dl className="archive-specs">
                     <div><dt>性能指数</dt><dd>{product.performance}</dd></div>
                     <div><dt>先進/目新/実用</dt><dd>{product.advancement} / {product.novelty} / {product.practicality}</dd></div>
-                    <div><dt>販売価格</dt><dd>{formatThousandYen(product.price)}</dd></div>
+                    <div><dt>販売価格</dt><dd>{formatUnitPrice(product.price)}</dd></div>
                     <div><dt>累計販売数</dt><dd>{product.totalUnitsSold}台</dd></div>
                     <div><dt>累計売上高</dt><dd>{formatMoney(product.totalRevenue)}</dd></div>
                     <div><dt>直近占有率</dt><dd>{formatBasisAsPercent(product.lastWeekShareBasis)}</dd></div>
@@ -64,7 +65,7 @@ export function Archive({ game }: { game: GameState }) {
           <div className="archive-grid">
             {archive.map(item => {
               const category = findCategory(item.categoryId);
-              const releaseYear = 1960 + Math.floor(item.releasedWeek / 48);
+              const releaseYear = game.startYear + Math.floor(item.releasedWeek / weeksPerYear);
               return (
                 <article key={item.id} className={`archive-card rank-${item.rank.toLowerCase()}`}>
                   <div className="archive-card-header">

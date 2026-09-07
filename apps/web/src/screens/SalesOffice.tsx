@@ -1,7 +1,9 @@
+import { adCampaigns } from '../../../../packages/content/src/advertising';
 import { channels } from '../../../../packages/content/src/channels';
-import { findCategory } from '../../../../packages/content/src/categories';
-import { formatBasisAsPercent, formatMoney, formatThousandYen } from '../../../../packages/simulation/src/money';
-import { channelCapacityUnits } from '../../../../packages/simulation/src/market';
+import { categories, findCategory, demandUnitsAt, unitsFromWorkload } from '../../../../packages/content/src/categories';
+import { weeksPerYear } from '../../../../packages/content/src/rules';
+import { formatBasisAsPercent, formatMoney, formatUnitPrice, formatUnits } from '../../../../packages/simulation/src/money';
+import { channelCapacityWorkload } from '../../../../packages/simulation/src/market';
 import { departmentReports, marketForecast } from '../../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../../packages/simulation/src/types';
 import {
@@ -25,7 +27,12 @@ export function SalesOffice({ game }: { game: GameState }) {
   const products = game.company.products;
   const forecast = marketForecast(game);
   const advertising = game.company.advertising ?? { activeCampaign: null, budget: 0, boostWeeksRemaining: 0, boostBasis: 0 };
-  const currentYear = game.startYear + Math.floor(game.week / 48);
+  const currentYear = game.startYear + Math.floor(game.week / weeksPerYear);
+  const salesWorkload = channelCapacityWorkload(game);
+  const ownCategoryIds = new Set(products.map(product => product.categoryId));
+  const ownMarkets = forecast.filter(market => ownCategoryIds.has(market.categoryId));
+  const otherMarkets = categories
+    .filter(category => !ownCategoryIds.has(category.id) && demandUnitsAt(category, currentYear) > 0);
 
   return (
     <>
@@ -33,8 +40,8 @@ export function SalesOffice({ game }: { game: GameState }) {
         {report ? <ExecutiveHeader report={report} game={game} /> : null}
         <MetricGrid
           metrics={[
-            { label: '販売能力', value: `${channelCapacityUnits(game)}台/週` },
-            { label: '先週の販売', value: `${game.lastWeek?.unitsSold ?? 0}台` },
+            { label: '販売能力', value: `${formatUnits(salesWorkload)}工数/週` },
+            { label: '先週の販売', value: `${formatUnits(game.lastWeek?.unitsSold ?? 0)}台` },
             { label: 'ブランド', value: (game.company.brandBasis / 100).toFixed(2) },
             {
               label: '広告宣伝状態',
@@ -72,20 +79,24 @@ export function SalesOffice({ game }: { game: GameState }) {
                     </th>
                     <td>{product.performance}</td>
                     <td>{product.advancement} / {product.novelty} / {product.practicality}</td>
-                    <td>{formatThousandYen(product.unitCost)}</td>
+                    <td>{formatUnitPrice(product.unitCost)}</td>
                     <td>
                       <NumberField
                         label={`${product.name}の価格`}
                         value={product.price}
                         min={1}
-                        max={1000}
-                        suffix="千円"
+                        max={2000000}
+                        step={Math.max(1, Math.round((category?.referencePrice ?? 1000) / 100))}
+                        suffix="円"
                         onCommit={price => dispatch({ type: 'setPrice', productId: product.id, price })}
                       />
-                      <small>{formatThousandYen(product.price)}</small>
+                      <small>
+                        標準 {formatUnitPrice(category?.referencePrice ?? 0)}
+                        ／販売能力 {category ? formatUnits(unitsFromWorkload(category, salesWorkload)) : 0}台/週
+                      </small>
                     </td>
                     <td>
-                      {product.lastWeekUnitsSold}台
+                      {formatUnits(product.lastWeekUnitsSold)}台
                       <small>占有率 {formatBasisAsPercent(product.lastWeekShareBasis)}</small>
                     </td>
                     <td>
@@ -118,8 +129,8 @@ export function SalesOffice({ game }: { game: GameState }) {
         <ScreenColumn>
           <Panel eyebrow="02 / 広告宣伝" title="マーケティング戦略">
             <p>
-              マスメディアや店頭での広告プロモーションを実施し、お茶の間の認知度と引き合いを一気に高めます。
-              ライバルの値下げに対抗し、市場シェアを奪還する切り札となります。
+              店頭の実演から新聞広告、やがてはラジオCM・テレビCMへ。
+              打てる媒体はその年に世の中にあるものだけで、時代が進むほど手が増えていきます。
             </p>
 
             {advertising.boostWeeksRemaining > 0 ? (
@@ -133,43 +144,28 @@ export function SalesOffice({ game }: { game: GameState }) {
             ) : null}
 
             <div className="ad-campaign-options">
-              <div className="ad-card">
-                <h4>全国テレビCM（テレビコマーシャル）</h4>
-                <p>お茶の間のゴールデンタイムにテレビCMを一斉放映。認知度を爆発的に高めます。</p>
-                <p className="spec">需要ブースト: <strong>+35%</strong> / 期間: 4週間 / ブランド大幅向上</p>
-                <button
-                  onClick={() => dispatch({ type: 'setAdvertising', campaign: 'tv', budget: 150 })}
-                  disabled={game.company.accounts.cash < 150}
-                >
-                  テレビCMを打つ（費用 150万円）
-                </button>
-              </div>
-
-              <div className="ad-card">
-                <h4>全国新聞・雑誌一面広告</h4>
-                <p>全国紙の一面や週刊誌・業界誌に大々的な広告を掲載。高い信頼性をアピール。</p>
-                <p className="spec">需要ブースト: <strong>+20%</strong> / 期間: 4週間 / ブランド向上</p>
-                <button
-                  className="secondary"
-                  onClick={() => dispatch({ type: 'setAdvertising', campaign: 'newspaper', budget: 80 })}
-                  disabled={game.company.accounts.cash < 80}
-                >
-                  新聞広告を打つ（費用 80万円）
-                </button>
-              </div>
-
-              <div className="ad-card">
-                <h4>全国店頭・街頭キャンペーン</h4>
-                <p>系列店や量販店の店頭で実演即売会やポスター掲示を展開。購買層に直結。</p>
-                <p className="spec">需要ブースト: <strong>+12%</strong> / 期間: 4週間</p>
-                <button
-                  className="secondary"
-                  onClick={() => dispatch({ type: 'setAdvertising', campaign: 'store', budget: 50 })}
-                  disabled={game.company.accounts.cash < 50}
-                >
-                  店頭キャンペーン（費用 50万円）
-                </button>
-              </div>
+              {adCampaigns.map(campaign => {
+                const usable = currentYear >= campaign.availableFrom;
+                return (
+                  <div className={usable ? 'ad-card' : 'ad-card locked'} key={campaign.id}>
+                    <h4>{campaign.name}</h4>
+                    <p>{campaign.description}</p>
+                    <p className="spec">
+                      需要ブースト: <strong>+{Math.round(campaign.boostBasis / 100)}%</strong> / 期間: 4週間
+                      {usable ? '' : ` / ${campaign.availableFrom}年から`}
+                    </p>
+                    <button
+                      className={campaign.id === 'tv' ? undefined : 'secondary'}
+                      onClick={() => dispatch({ type: 'setAdvertising', campaign: campaign.id, budget: campaign.cost })}
+                      disabled={!usable || game.company.accounts.cash < campaign.cost}
+                    >
+                      {usable
+                        ? `${campaign.name}を打つ（費用 ${campaign.cost}万円）`
+                        : `${campaign.availableFrom}年まで打てない`}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </Panel>
         </ScreenColumn>
@@ -193,7 +189,7 @@ export function SalesOffice({ game }: { game: GameState }) {
                       {channel.name}
                       <small>{channel.description}</small>
                     </th>
-                    <td>{channel.capacityPerUnit}台/週</td>
+                    <td>{formatUnits(channel.capacityPerUnit)}工数/週</td>
                     <td>{formatMoney(channel.weeklyCost)}/週</td>
                     <td>{formatBasisAsPercent(channel.commissionBasis)}</td>
                     <td>{formatMoney(channel.openCost)}</td>
@@ -208,17 +204,20 @@ export function SalesOffice({ game }: { game: GameState }) {
                 ))}
               </tbody>
             </table>
-            <small>販路がないと発売できません。販売能力を超えた分は売れ残ります。</small>
+            <small>
+              販路の能力も生産と同じ「工数」で数えます。1店で乾電池なら数万本、白黒テレビなら数十台をさばける計算です。
+              販路がないと発売できません。販売能力を超えた分は売れ残ります。
+            </small>
           </Panel>
         </ScreenColumn>
       </ScreenColumns>
 
       <Panel eyebrow="04 / 市場シェアと競合" title="市場争奪戦（需要予測・占有率）">
-        <p>自社とライバル3社（光和電機、日之出工業、三嶺電器）とのリアルタイムなシェア比較です。</p>
+        <p>自社が参入している市場での、ライバル3社（光和電機、日之出工業、三嶺電器）とのシェア比較です。</p>
         <div className="market-overview-grid">
-          {forecast.map(market => (
+          {ownMarkets.map(market => (
             <div key={market.categoryId} className="market-category-card">
-              <h3>{market.categoryName} 市場（全体需要: {market.demandUnits}台/週）</h3>
+              <h3>{market.categoryName} 市場（全体需要: {formatUnits(market.demandUnits)}台/週）</h3>
               <div className="chart-and-table">
                 <SharePieChart entries={market.entries} size={160} />
                 <div className="market-table-wrap">
@@ -231,9 +230,9 @@ export function SalesOffice({ game }: { game: GameState }) {
                         <tr key={entry.id} className={entry.owner === 'player' ? 'own' : undefined}>
                           <th scope="row">{entry.name}{entry.owner === 'player' ? '（自社）' : ''}</th>
                           <td>{entry.performance}</td>
-                          <td>{formatThousandYen(entry.price)}</td>
+                          <td>{formatUnitPrice(entry.price)}</td>
                           <td><strong>{formatBasisAsPercent(entry.shareBasis)}</strong></td>
-                          <td>{entry.unitsDemanded}台</td>
+                          <td>{formatUnits(entry.unitsDemanded)}台</td>
                         </tr>
                       ))}
                       {market.entries.length === 0 ? (
@@ -245,6 +244,29 @@ export function SalesOffice({ game }: { game: GameState }) {
               </div>
             </div>
           ))}
+          {ownMarkets.length === 0 ? <p>まだどの市場にも参入していません。研究所で製品を開発してください。</p> : null}
+        </div>
+      </Panel>
+
+      <Panel eyebrow="05 / 未参入市場" title="いま世の中で売られているもの">
+        <p>この年に売られている製品分類と、その市場規模です。参入していない市場は空白のまま他社に取られています。</p>
+        <div className="market-table-wrap">
+          <table>
+            <thead>
+              <tr><th>製品分類</th><th>発売年</th><th>市場規模</th><th>標準価格</th><th>100台の工数</th></tr>
+            </thead>
+            <tbody>
+              {otherMarkets.map(category => (
+                <tr key={category.id}>
+                  <th scope="row">{category.name}</th>
+                  <td>{category.availableFrom}年</td>
+                  <td>{formatUnits(demandUnitsAt(category, currentYear))}台/週</td>
+                  <td>{formatUnitPrice(category.referencePrice)}</td>
+                  <td>{category.workloadPer100Units}工数</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </Panel>
     </>

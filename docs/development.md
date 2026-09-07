@@ -35,7 +35,7 @@ Viteの `/api` プロキシからポート8787のローカルAPIへ接続する�
 npm run check
 ```
 
-型検査、Lint、Vitest、Webビルド、Workerのdry-runを実行。Vitestにはエンジンの単体テストと、SC01を240週通す自動試走が含まれる。成果物は `dist/web` と `dist/api`。顔一覧原画（約2MB）をそのままバンドルしているため、Web成果物はその分大きい。個別スプライト化と軽量化はS9で行う。`npm run preview` はWeb成果物のみの確認用で、開発用APIプロキシは含まない。GitHub Actionsも同じ検証とローカルDBマイグレーションを実行する。CI設定追加とGitHub上での成功は区別する。
+型検査、Lint、Vitest、Webビルド、Workerのdry-runを実行。Vitestにはエンジンの単体テストと、SC01を480週通す自動試走が含まれる。成果物は `dist/web` と `dist/api`。顔一覧原画（約2MB）をそのままバンドルしているため、Web成果物はその分大きい。個別スプライト化と軽量化はS9で行う。`npm run preview` はWeb成果物のみの確認用で、開発用APIプロキシは含まない。GitHub Actionsも同じ検証とローカルDBマイグレーションを実行する。CI設定追加とGitHub上での成功は区別する。
 
 Workers型は `npm run api:types` で生成。DB設定変更後は再生成する。ローカルD1は `.wrangler/` 以下に保存しGit管理対象外。本番D1のバインディングと公開ドメインは `apps/api/wrangler.jsonc` を正本とする。
 

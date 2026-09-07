@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
-import { categories, type CategoryId } from '../../../../packages/content/src/categories';
-import { economyRules } from '../../../../packages/content/src/rules';
+import {
+  categories,
+  categorySegments,
+  findCategory,
+  unitsFromWorkload,
+  type CategoryId,
+} from '../../../../packages/content/src/categories';
+import { economyRules, weeksPerYear } from '../../../../packages/content/src/rules';
 import {
   findModule,
   moduleSlots,
@@ -9,8 +15,9 @@ import {
   techName,
 } from '../../../../packages/content/src/technology';
 import { defaultModuleIds, evaluateDesign, maxQualityLevel } from '../../../../packages/simulation/src/design';
-import { formatMoney, formatThousandYen } from '../../../../packages/simulation/src/money';
+import { formatMoney, formatUnitPrice, formatUnits } from '../../../../packages/simulation/src/money';
 import { departmentReports } from '../../../../packages/simulation/src/selectors';
+import { productionCapacityWorkload } from '../../../../packages/simulation/src/week';
 import type { GameState } from '../../../../packages/simulation/src/types';
 import {
   ExecutiveHeader,
@@ -24,30 +31,43 @@ import {
 } from '../components/ui';
 import { useGameStore } from '../store';
 
+/** その年・その技術で設計できる分類を、分野ごとにまとめて選択肢にする。 */
+function designableCategories(year: number, owned: readonly string[]) {
+  return categories.filter(category => category.availableFrom <= year && owned.includes(category.requiredTechId));
+}
+
 export function Lab({ game }: { game: GameState }) {
   const dispatch = useGameStore(store => store.dispatch);
   const setScreen = useGameStore(store => store.setScreen);
   const setDevelopmentDraft = useGameStore(store => store.setDevelopmentDraft);
   const report = departmentReports(game).find(entry => entry.executiveId === 'design');
   const owned = game.company.ownedTechIds;
-  const currentYear = game.startYear + Math.floor(game.week / 48);
+  const currentYear = game.startYear + Math.floor(game.week / weeksPerYear);
 
-  const [categoryId, setCategoryId] = useState<CategoryId>('refrigerator');
-  const [moduleIds, setModuleIds] = useState<string[]>(() => defaultModuleIds('refrigerator'));
+  const designable = useMemo(() => designableCategories(currentYear, owned), [currentYear, owned]);
+  const firstDesignable = designable[0]?.id ?? 'battery-dry';
+
+  const [categoryId, setCategoryId] = useState<CategoryId>(firstDesignable);
+  const [moduleIds, setModuleIds] = useState<string[]>(() => defaultModuleIds(firstDesignable));
   const [quality, setQuality] = useState(1);
-  const [name, setName] = useState('あかつき冷蔵庫1号');
+  const [name, setName] = useState(() => `${findCategory(firstDesignable)?.name ?? ''}1号`);
+
+  // 年や技術が進んで今の選択が設計できなくなったら、先頭の分類へ戻す。
+  const selected = designable.find(category => category.id === categoryId);
+  if (!selected && designable[0] && categoryId !== designable[0].id) {
+    changeCategory(designable[0].id);
+  }
+  const category = selected ?? designable[0] ?? findCategory('battery-dry');
 
   const evaluation = useMemo(
-    () => evaluateDesign({ categoryId, moduleIds, qualityLevel: quality, ownedTechIds: owned }),
-    [categoryId, moduleIds, quality, owned],
+    () => evaluateDesign({ categoryId, moduleIds, qualityLevel: quality, ownedTechIds: owned, currentYear }),
+    [categoryId, moduleIds, quality, owned, currentYear],
   );
 
   function changeCategory(next: CategoryId) {
     setCategoryId(next);
     setModuleIds(defaultModuleIds(next));
-    if (next === 'refrigerator') setName('あかつき冷蔵庫1号');
-    else if (next === 'washer') setName('あかつき噴流洗濯機1号');
-    else if (next === 'television') setName('あかつきテレビ1号');
+    setName(`${findCategory(next)?.name ?? ''}1号`);
   }
 
   function changeModule(slotIndex: number, moduleId: string) {
@@ -57,6 +77,12 @@ export function Lab({ game }: { game: GameState }) {
   const research = game.company.research;
   const activeTheme = researchThemes.find(theme => theme.id === research.themeId);
   const releasedProducts = game.company.products.filter(p => p.releasedWeek !== null);
+  const capacity = productionCapacityWorkload(game);
+  const weeklyBuildable = category ? unitsFromWorkload(category, capacity) : 0;
+
+  const upcoming = categories.filter(
+    entry => entry.availableFrom > currentYear && entry.availableFrom <= currentYear + 3,
+  );
 
   return (
     <>
@@ -67,7 +93,7 @@ export function Lab({ game }: { game: GameState }) {
       <ScreenColumns variant="side-first">
         <ScreenColumn>
           <Panel eyebrow="01 / 研究" title="研究課題">
-            <p>研究予算は週ごとに現金から支払い、そのまま研究ポイントになります。完了すると新しい部品や生産技術が使えます。</p>
+            <p>研究予算は週ごとに現金から支払い、そのまま研究ポイントになります。完了すると新しい製品分類・部品・生産技術が使えます。</p>
             <NumberField
               label="研究予算"
               value={research.weeklyBudget}
@@ -92,10 +118,15 @@ export function Lab({ game }: { game: GameState }) {
               <tbody>
                 {researchThemes.map(theme => {
                   const done = owned.includes(theme.grantsTechId);
-                  const ready = theme.requiredTechIds.every(techId => owned.includes(techId));
+                  const hasPrereq = theme.requiredTechIds.every(techId => owned.includes(techId));
+                  const inEra = currentYear >= theme.minYear;
+                  const ready = hasPrereq && inEra;
                   return (
                     <tr key={theme.id}>
-                      <th scope="row">{theme.name}</th>
+                      <th scope="row">
+                        {theme.name}
+                        {theme.minYear > game.startYear ? <small>{theme.minYear}年〜</small> : null}
+                      </th>
                       <td>{theme.requiredPoints}pt</td>
                       <td>{theme.effect}</td>
                       <td>
@@ -105,7 +136,11 @@ export function Lab({ game }: { game: GameState }) {
                             disabled={!ready || research.themeId === theme.id}
                             onClick={() => dispatch({ type: 'setResearchTheme', themeId: theme.id })}
                           >
-                            {research.themeId === theme.id ? '着手中' : ready ? 'この課題にする' : '前提技術が必要'}
+                            {research.themeId === theme.id
+                              ? '着手中'
+                              : !inEra
+                                ? `${theme.minYear}年まで待つ`
+                                : ready ? 'この課題にする' : '前提技術が必要'}
                           </button>
                         )}
                       </td>
@@ -132,9 +167,17 @@ export function Lab({ game }: { game: GameState }) {
                 <label className="field">
                   <span>製品分類</span>
                   <select value={categoryId} onChange={event => changeCategory(event.target.value as CategoryId)}>
-                    {categories.map(category => (
-                      <option key={category.id} value={category.id}>{category.name}</option>
-                    ))}
+                    {categorySegments.map(segment => {
+                      const options = designable.filter(entry => entry.segment === segment.id);
+                      if (options.length === 0) return null;
+                      return (
+                        <optgroup key={segment.id} label={segment.name}>
+                          {options.map(entry => (
+                            <option key={entry.id} value={entry.id}>{entry.name}</option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
                   </select>
                 </label>
                 {moduleSlots.map((slot, index) => (
@@ -170,6 +213,13 @@ export function Lab({ game }: { game: GameState }) {
               </div>
             </div>
 
+            {category ? (
+              <p className="module-note">
+                {category.description}
+                （市場の標準価格{formatUnitPrice(category.referencePrice)}／100台あたり{category.workloadPer100Units}工数。
+                いまの工場なら週{formatUnits(weeklyBuildable)}台まで作れます）
+              </p>
+            ) : null}
             <p className="module-note">
               {moduleIds.map(moduleId => findModule(moduleId)?.description).filter(Boolean).join(' / ')}
             </p>
@@ -180,10 +230,10 @@ export function Lab({ game }: { game: GameState }) {
                   metrics={[
                     { label: '性能', value: `${evaluation.spec.performance}` },
                     { label: '消費電力', value: `${evaluation.spec.energy}`, note: '100が標準' },
-                    { label: '製造原価', value: formatThousandYen(evaluation.spec.unitCost) },
+                    { label: '製造原価', value: formatUnitPrice(evaluation.spec.unitCost) },
                     { label: '開発期間', value: `${evaluation.spec.devWeeks}週` },
                     { label: '開発費', value: formatMoney(evaluation.spec.devCost) },
-                    { label: '推奨価格', value: formatThousandYen(evaluation.spec.suggestedPrice) },
+                    { label: '推奨価格', value: formatUnitPrice(evaluation.spec.suggestedPrice) },
                   ]}
                 />
                 <button
@@ -204,7 +254,21 @@ export function Lab({ game }: { game: GameState }) {
             </small>
           </Panel>
 
-          <Panel eyebrow="03 / 開発中" title="進行中の案件">
+          {upcoming.length > 0 ? (
+            <Panel eyebrow="03 / 時代" title="まもなく世に出る製品">
+              <p>研究が進んでも、世の中に出ていない製品は作れません。近く手が届く分類は次のとおりです。</p>
+              <ul className="upcoming-list">
+                {upcoming.map(entry => (
+                  <li key={entry.id}>
+                    <strong>{entry.availableFrom}年</strong>：{entry.name}
+                    <small>（必要な技術：{techName(entry.requiredTechId)}）</small>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          ) : null}
+
+          <Panel eyebrow="04 / 開発中" title="進行中の案件">
             {game.company.projects.length === 0 ? <p>進行中の開発はありません。</p> : (
               <table>
                 <thead>
@@ -221,7 +285,7 @@ export function Lab({ game }: { game: GameState }) {
                       </th>
                       <td>{project.remainingWeeks}週</td>
                       <td>{formatMoney(project.paidCost)} / {formatMoney(project.devCost)}</td>
-                      <td>{formatThousandYen(project.unitCost)}</td>
+                      <td>{formatUnitPrice(project.unitCost)}</td>
                       <td>{project.advancement} / {project.novelty} / {project.practicality}</td>
                       <td>
                         <button className="secondary" onClick={() => dispatch({ type: 'cancelDevelopment', projectId: project.id })}>
@@ -237,7 +301,7 @@ export function Lab({ game }: { game: GameState }) {
           </Panel>
 
           {releasedProducts.length > 0 ? (
-            <Panel eyebrow="04 / 改良" title="マイナーチェンジ（鮮度回復）">
+            <Panel eyebrow="05 / 改良" title="マイナーチェンジ（鮮度回復）">
               <p>発売から時間が経過して市場での鮮度が低下した製品に改良を加えます。50万円の費用で鮮度が全回復し、性能がわずかに向上します。</p>
               <table>
                 <thead>

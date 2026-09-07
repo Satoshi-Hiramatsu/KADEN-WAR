@@ -1,6 +1,12 @@
-import { findCategory, type CategoryId } from '../../content/src/categories';
-import { extraDevWeeksForFeatureCount, findFeature, maxSelectableFeatures } from '../../content/src/features';
-import { findModule, moduleSlots } from '../../content/src/technology';
+import { findCategory, type CategoryDefinition, type CategoryId } from '../../content/src/categories';
+import {
+  extraDevWeeksForFeatureCount,
+  featureAllowsCategory,
+  findFeature,
+  maxSelectableFeatures,
+  type FeatureOption,
+} from '../../content/src/features';
+import { findModule, moduleAllowsCategory, moduleSlots, modulesFor } from '../../content/src/technology';
 
 export type DesignSpec = {
   categoryId: CategoryId;
@@ -9,11 +15,11 @@ export type DesignSpec = {
   featureIds: readonly string[];
   performance: number;
   energy: number;
-  /** 標準製造原価（千円）。 */
+  /** 標準製造原価（円）。 */
   unitCost: number;
   devWeeks: number;
   devCost: number;
-  /** 原価から求めた推奨価格（千円）。 */
+  /** 原価から求めた推奨価格（円）。 */
   suggestedPrice: number;
   /** 先進性：技術的な野心度。 */
   advancement: number;
@@ -34,9 +40,19 @@ export type DesignInput = {
   qualityLevel: number;
   ownedTechIds: readonly string[];
   featureIds?: readonly string[];
-  /** 付加価値項目の解禁判定に使う現在年。省略時は解禁チェックを行わない。 */
+  /** 付加価値項目と製品分類の解禁判定に使う現在年。省略時は年の判定を行わない。 */
   currentYear?: number;
 };
+
+/** 分類の標準原価に対する万分率を、円の実額へ直す。 */
+function costFromBasis(category: CategoryDefinition, basis: number): number {
+  return Math.round((category.baseUnitCost * basis) / 10000);
+}
+
+/** 分類の標準開発費に対する万分率を、万円の実額へ直す。 */
+function devCostFromBasis(category: CategoryDefinition, basis: number): number {
+  return Math.round((category.baseDevCost * basis) / 10000);
+}
 
 /**
  * 設計案から仕様・原価・開発期間を求める。プレビューと開発開始で同じ関数を使い、
@@ -45,6 +61,9 @@ export type DesignInput = {
 export function evaluateDesign(input: DesignInput): DesignEvaluation {
   const category = findCategory(input.categoryId);
   if (!category) return { ok: false, error: '製品分類が見つかりません。' };
+  if (input.currentYear !== undefined && input.currentYear < category.availableFrom) {
+    return { ok: false, error: `${category.name}が世に出るのは${category.availableFrom}年からです。` };
+  }
   if (!input.ownedTechIds.includes(category.requiredTechId)) {
     return { ok: false, error: `${category.name}の設計には基礎技術が必要です。` };
   }
@@ -69,23 +88,23 @@ export function evaluateDesign(input: DesignInput): DesignEvaluation {
     const module = findModule(moduleId);
     if (!module) return { ok: false, error: `部品が見つかりません: ${moduleId}` };
     if (module.slot !== slot.id) return { ok: false, error: `${slot.name}に指定できない部品です。` };
-    if (!module.categoryIds.includes(category.id)) {
+    if (!moduleAllowsCategory(module, category.id)) {
       return { ok: false, error: `${category.name}に使えない部品です: ${module.name}` };
     }
     if (module.requiredTechId && !input.ownedTechIds.includes(module.requiredTechId)) {
       return { ok: false, error: `未解禁の部品です: ${module.name}` };
     }
     performance += module.performance;
-    unitCost += module.unitCost;
+    unitCost += module.unitCost + costFromBasis(category, module.unitCostBasis);
     devWeeks += module.devWeeks;
-    devCost += module.devCost;
+    devCost += devCostFromBasis(category, module.devCostBasis);
     energyTotal += module.energy;
   }
 
   performance += input.qualityLevel * 9;
-  unitCost += input.qualityLevel * 2;
+  unitCost += costFromBasis(category, input.qualityLevel * 600);
   devWeeks += input.qualityLevel;
-  devCost += input.qualityLevel * 130;
+  devCost += devCostFromBasis(category, input.qualityLevel * 2000);
   let advancement = input.qualityLevel * 2;
   let novelty = 0;
   let practicality = input.qualityLevel * 2;
@@ -100,7 +119,7 @@ export function evaluateDesign(input: DesignInput): DesignEvaluation {
     seenFeatureIds.add(featureId);
     const feature = findFeature(featureId);
     if (!feature) return { ok: false, error: `付加価値項目が見つかりません: ${featureId}` };
-    if (feature.categoryId !== category.id) {
+    if (!featureAllowsCategory(feature, category.id)) {
       return { ok: false, error: `${category.name}に使えない付加価値項目です: ${feature.name}` };
     }
     if (feature.requiredTechId && !input.ownedTechIds.includes(feature.requiredTechId)) {
@@ -110,9 +129,9 @@ export function evaluateDesign(input: DesignInput): DesignEvaluation {
       return { ok: false, error: `時期尚早の付加価値項目です: ${feature.name}` };
     }
     performance += feature.performance;
-    unitCost += feature.unitCost;
+    unitCost += feature.unitCost + costFromBasis(category, feature.unitCostBasis);
     devWeeks += feature.devWeeks;
-    devCost += feature.devCost;
+    devCost += feature.devCost + devCostFromBasis(category, feature.devCostBasis);
     energyDelta += feature.energy;
     advancement += feature.advancement;
     novelty += feature.novelty;
@@ -121,6 +140,7 @@ export function evaluateDesign(input: DesignInput): DesignEvaluation {
   devWeeks += extraDevWeeksForFeatureCount(featureIds.length);
 
   const energy = Math.round(energyTotal / moduleSlots.length) + energyDelta;
+  unitCost = Math.max(1, Math.round(unitCost));
   const suggestedPrice = Math.max(1, Math.floor((unitCost * category.suggestedMarginBasis) / 10000));
 
   return {
@@ -143,12 +163,27 @@ export function evaluateDesign(input: DesignInput): DesignEvaluation {
   };
 }
 
-/** 未指定のスロットを初期部品で埋めた既定の設計案。 */
+/** 付加価値項目がその分類で実際にいくら原価を押し上げるか（円）。 */
+export function featureUnitCostFor(categoryId: string, feature: FeatureOption): number {
+  const category = findCategory(categoryId);
+  if (!category) return feature.unitCost;
+  return feature.unitCost + costFromBasis(category, feature.unitCostBasis);
+}
+
+/** 付加価値項目がその分類で実際にいくら開発費を押し上げるか（万円）。 */
+export function featureDevCostFor(categoryId: string, feature: FeatureOption): number {
+  const category = findCategory(categoryId);
+  if (!category) return feature.devCost;
+  return feature.devCost + devCostFromBasis(category, feature.devCostBasis);
+}
+
+/** 各スロットを、その分類で最初から使える部品で埋めた既定の設計案。 */
 export function defaultModuleIds(categoryId: CategoryId): string[] {
-  const defaults: Record<CategoryId, string[]> = {
-    refrigerator: ['mod-cool-1', 'mod-eco-1', 'mod-body-1'],
-    washer: ['mod-wash-1', 'mod-eco-1', 'mod-body-1'],
-    television: ['mod-image-1', 'mod-eco-1', 'mod-body-1'],
-  };
-  return [...defaults[categoryId]];
+  return moduleSlots.map(slot => {
+    const candidates = modulesFor(categoryId, slot.id);
+    const basic = candidates.find(module => module.requiredTechId === null);
+    const chosen = basic ?? candidates[0];
+    if (!chosen) throw new RangeError(`${categoryId}の${slot.name}に使える部品がありません。`);
+    return chosen.id;
+  });
 }

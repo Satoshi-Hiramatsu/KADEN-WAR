@@ -1,3 +1,5 @@
+import { findCategory, workloadForUnits } from '../../content/src/categories';
+import { findAdCampaign } from '../../content/src/advertising';
 import { channels, findChannel, type ChannelId } from '../../content/src/channels';
 import { findExecutive } from '../../content/src/executives';
 import { findMeetingCast, type MeetingCastId } from '../../content/src/meetingCast';
@@ -7,8 +9,8 @@ import { evaluateDesign, type DesignSpec } from './design';
 import { payCash, post } from './ledger';
 import { evaluateDevelopmentMeeting, type MeetingAttendeeId } from './meeting';
 import { nextInt } from './rng';
-import { productionCapacityUnits } from './week';
-import type { CommandResult, DevelopmentProject, GameState, Money } from './types';
+import { productionCapacityWorkload, productRank } from './week';
+import type { AdvertisingCampaignType, CommandResult, DevelopmentProject, GameState, Money } from './types';
 
 export type Command =
   | { type: 'setResearchTheme'; themeId: string | null }
@@ -32,7 +34,7 @@ export type Command =
   | { type: 'investEquipment'; units: number }
   | { type: 'borrow'; amount: Money }
   | { type: 'repay'; amount: Money }
-  | { type: 'setAdvertising'; campaign: 'tv' | 'newspaper' | 'store'; budget: Money }
+  | { type: 'setAdvertising'; campaign: AdvertisingCampaignType; budget: Money }
   | { type: 'setWageLevel'; level: number }
   | { type: 'conductTraining'; cost: Money }
   | { type: 'payBonus'; amountPerEmployee: Money }
@@ -101,6 +103,10 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       const theme = findResearchTheme(command.themeId);
       if (!theme) return fail(state, '研究課題が見つかりません。');
       if (company.ownedTechIds.includes(theme.grantsTechId)) return fail(state, 'その技術はすでに保有しています。');
+      const researchYear = draft.startYear + Math.floor(draft.week / weeksPerYear);
+      if (researchYear < theme.minYear) {
+        return fail(state, `${theme.name}に着手できるのは${theme.minYear}年からです。`);
+      }
       const missing = theme.requiredTechIds.filter(techId => !company.ownedTechIds.includes(techId));
       if (missing.length > 0) return fail(state, '前提技術が足りません。');
       if (company.research.themeId !== command.themeId) {
@@ -192,8 +198,8 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
     case 'setPrice': {
       const product = company.products.find(candidate => candidate.id === command.productId);
       if (!product) return fail(state, '製品が見つかりません。');
-      if (!Number.isInteger(command.price) || command.price <= 0) return fail(state, '価格は1以上の整数（千円）で指定してください。');
-      if (command.price > 10000) return fail(state, '価格が上限を超えています。');
+      if (!Number.isInteger(command.price) || command.price <= 0) return fail(state, '価格は1円以上の整数で指定してください。');
+      if (command.price > 2_000_000) return fail(state, '価格が上限を超えています。');
       product.price = command.price;
       break;
     }
@@ -201,12 +207,17 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       const product = company.products.find(candidate => candidate.id === command.productId);
       if (!product) return fail(state, '製品が見つかりません。');
       if (!Number.isInteger(command.units) || command.units < 0) return fail(state, '生産量は0以上の整数で指定してください。');
-      const capacity = productionCapacityUnits(draft);
-      let planned = 0;
+      const capacity = productionCapacityWorkload(draft);
+      let plannedWorkload = 0;
       for (const candidate of company.products) {
-        planned += candidate.id === product.id ? command.units : candidate.productionPlan;
+        const candidateCategory = findCategory(candidate.categoryId);
+        if (!candidateCategory) continue;
+        const units = candidate.id === product.id ? command.units : candidate.productionPlan;
+        plannedWorkload += workloadForUnits(candidateCategory, units);
       }
-      if (planned > capacity) return fail(state, `週の生産能力${capacity}台を超えています。`);
+      if (plannedWorkload > capacity) {
+        return fail(state, `週の生産能力${capacity.toLocaleString('ja-JP')}工数を超えています（計画${plannedWorkload.toLocaleString('ja-JP')}工数）。`);
+      }
       product.productionPlan = command.units;
       break;
     }
@@ -254,7 +265,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       post(draft, { debit: 'equipment', credit: 'cash', amount: cost, reason: '設備投資', flow: 'investing' });
       company.equipmentCost += cost;
       company.purchasedEquipmentUnits += command.units;
-      company.baseCapacityUnits += addedCapacity;
+      company.baseWorkloadCapacity += addedCapacity;
       break;
     }
     case 'borrow': {
@@ -271,10 +282,16 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       break;
     }
     case 'setAdvertising': {
-      if (command.budget < 50) return fail(state, '広告予算は50万円以上で指定してください。');
+      if (command.budget < 30) return fail(state, '広告予算は30万円以上で指定してください。');
       if (company.accounts.cash < command.budget) return fail(state, `広告費${command.budget}万円を支払う現金がありません。`);
-      payCash(draft, { debit: 'sellingExpense', amount: command.budget, reason: `広告宣伝（${command.campaign.toUpperCase()}）`, flow: 'operating' });
-      const boostBasis = command.campaign === 'tv' ? 3500 : command.campaign === 'newspaper' ? 2000 : 1200;
+      const adYear = draft.startYear + Math.floor(draft.week / weeksPerYear);
+      const definition = findAdCampaign(command.campaign);
+      if (!definition) return fail(state, '広告の種類が見つかりません。');
+      if (adYear < definition.availableFrom) {
+        return fail(state, `${definition.name}を打てるのは${definition.availableFrom}年からです。`);
+      }
+      payCash(draft, { debit: 'sellingExpense', amount: command.budget, reason: `広告宣伝（${definition.name}）`, flow: 'operating' });
+      const boostBasis = definition.boostBasis;
       company.advertising = {
         activeCampaign: command.campaign,
         budget: command.budget,
@@ -320,9 +337,9 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       if (index < 0) return fail(state, '製品が見つかりません。');
       const product = company.products[index]!;
       product.onSale = false;
-      const rank = product.totalUnitsSold >= 2000 ? 'S' : product.totalUnitsSold >= 1000 ? 'A' : product.totalUnitsSold >= 500 ? 'B' : 'C';
+      const rank = productRank(product.totalRevenue);
       const awards: string[] = [];
-      if (product.totalUnitsSold >= 1000) awards.push('年間ベストセラー');
+      if (product.totalRevenue >= 8000) awards.push('年間ベストセラー');
       if (product.performance >= 110) awards.push('通産省グッドデザイン選定');
       const archived = company.archive.find(a => a.id === product.id);
       if (archived) {
@@ -349,7 +366,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
           peakShareBasis: product.lastWeekShareBasis,
           rank,
           awards,
-          review: `市場を彩った${product.name}。生涯販売数${product.totalUnitsSold}台を記録して殿堂入り。`,
+          review: `市場を彩った${product.name}。生涯販売数${product.totalUnitsSold.toLocaleString('ja-JP')}台を記録して殿堂入り。`,
         });
       }
       company.products.splice(index, 1);

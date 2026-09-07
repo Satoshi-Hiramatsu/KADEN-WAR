@@ -3,7 +3,7 @@ import type { ChannelId } from '../../content/src/channels';
 
 export type { CategoryId, ChannelId };
 
-/** 金額は万円の整数。単価・価格だけ千円の整数で持つ。 */
+/** 金額は万円の整数。単価・価格だけ円の整数で持つ。 */
 export type Money = number;
 
 export type DebitAccountId =
@@ -77,7 +77,7 @@ export type DevelopmentProject = {
   featureIds: readonly string[];
   performance: number;
   energy: number;
-  /** 標準製造原価（千円）。 */
+  /** 標準製造原価（円）。 */
   unitCost: number;
   devWeeks: number;
   devCost: Money;
@@ -103,9 +103,9 @@ export type Product = {
   featureIds: readonly string[];
   performance: number;
   energy: number;
-  /** 標準製造原価（千円）。 */
+  /** 標準製造原価（円）。 */
   unitCost: number;
-  /** 販売価格（千円）。 */
+  /** 販売価格（円）。 */
   price: number;
   completedWeek: number;
   releasedWeek: number | null;
@@ -125,7 +125,7 @@ export type Product = {
   meetingLog: readonly string[];
 };
 
-export type AdvertisingCampaignType = 'tv' | 'newspaper' | 'store';
+export type AdvertisingCampaignType = 'tv' | 'radio' | 'newspaper' | 'store';
 
 export type AdvertisingState = {
   activeCampaign: AdvertisingCampaignType | null;
@@ -192,7 +192,8 @@ export type CompanyState = {
   accounts: Record<AccountId, Money>;
   brandBasis: number;
   employees: number;
-  baseCapacityUnits: number;
+  /** 週あたりの生産能力（工数）。台数は製品分類ごとの工数から決まる。 */
+  baseWorkloadCapacity: number;
   /** 設備の取得価額合計。減価償却の計算に使う。 */
   equipmentCost: Money;
   /** 追加購入した設備の口数。上限判定に使う。 */

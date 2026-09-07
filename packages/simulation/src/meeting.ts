@@ -1,7 +1,9 @@
-import { findCategory } from '../../content/src/categories';
+import { findCategory, unitsFromWorkload } from '../../content/src/categories';
 import { unlockedFeaturesFor, type FeatureOption } from '../../content/src/features';
 import type { DesignSpec } from './design';
-import { productionCapacityUnits } from './week';
+import { formatUnitPrice, formatUnits } from './money';
+import { productionCapacityWorkload } from './week';
+import { weeksPerYear } from '../../content/src/rules';
 import type { GameState } from './types';
 
 /** 開発会議の出席者。設計課長・設計係長は既存 executives.ts の統括陣とは別の脇役。 */
@@ -42,7 +44,7 @@ const designAmbitionLow = 12;
  */
 export function evaluateDevelopmentMeeting(state: GameState, spec: DesignSpec): MeetingEvaluation {
   const category = findCategory(spec.categoryId);
-  const year = state.startYear + Math.floor(state.week / 48);
+  const year = state.startYear + Math.floor(state.week / weeksPerYear);
   const unlocked = category ? unlockedFeaturesFor(category.id, year, state.company.ownedTechIds) : [];
   const stances: MeetingStance[] = [];
 
@@ -86,12 +88,13 @@ export function evaluateDevelopmentMeeting(state: GameState, spec: DesignSpec): 
   if (category) {
     const costRatio = spec.unitCost / category.baseUnitCost;
     const weeksRatio = spec.devWeeks / category.baseDevWeeks;
-    const capacity = productionCapacityUnits(state);
+    const capacity = productionCapacityWorkload(state);
+    const buildableUnits = unitsFromWorkload(category, capacity);
     if (costRatio >= 1.9 || weeksRatio >= 2.2) {
       stances.push({
         id: 'production',
         tone: 'objection',
-        comment: `原価${spec.unitCost}千円・開発${spec.devWeeks}週は工場が持ちません。機能を絞るか品質投資を見直してください。`,
+        comment: `原価${formatUnitPrice(spec.unitCost)}・開発${spec.devWeeks}週は工場が持ちません。機能を絞るか品質投資を見直してください。`,
       });
     } else if (costRatio >= 1.5 || weeksRatio >= 1.6) {
       stances.push({
@@ -103,7 +106,7 @@ export function evaluateDevelopmentMeeting(state: GameState, spec: DesignSpec): 
       stances.push({
         id: 'production',
         tone: 'positive',
-        comment: `原価${spec.unitCost}千円なら現在の生産能力（週${capacity}台）で無理なく回せます。`,
+        comment: `原価${formatUnitPrice(spec.unitCost)}なら、いまの工場でも週${formatUnits(buildableUnits)}台まで無理なく作れます。`,
       });
     }
   }
@@ -115,7 +118,7 @@ export function evaluateDevelopmentMeeting(state: GameState, spec: DesignSpec): 
     const weakestSelected = spec.featureIds
       .map(id => unlocked.find(feature => feature.id === id))
       .filter((feature): feature is FeatureOption => feature !== undefined)
-      .sort((a, b) => (a.practicality - a.unitCost) - (b.practicality - b.unitCost))[0];
+      .sort((a, b) => (a.practicality - a.unitCostBasis / 400) - (b.practicality - b.unitCostBasis / 400))[0];
 
     if (spec.practicality < 10 && priceRatio >= 1.4) {
       stances.push({
