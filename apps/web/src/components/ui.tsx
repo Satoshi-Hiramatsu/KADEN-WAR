@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { findExecutive, type ExecutiveId } from '../../../../packages/content/src/executives';
 import { findMeetingCast, type MeetingCastId } from '../../../../packages/content/src/meetingCast';
 import type { DepartmentReport } from '../../../../packages/simulation/src/selectors';
@@ -140,6 +140,18 @@ export function NpcPortrait({
   );
 }
 
+/* 拠点ヘッダーの背景バナー（担当役員の顔つき）は縦を大きく占有するため、
+   プレイヤーが畳めるようにして、その状態を端末に記憶する。 */
+const BANNER_PREF_KEY = 'kadenwar.sceneBanner';
+
+function readBannerPreference(): boolean {
+  try {
+    return window.localStorage.getItem(BANNER_PREF_KEY) !== 'collapsed';
+  } catch {
+    return true;
+  }
+}
+
 export function SceneBanner({
   sceneKey,
   game,
@@ -153,18 +165,46 @@ export function SceneBanner({
   eyebrow?: string;
   children?: ReactNode;
 }) {
+  const [open, setOpen] = useState(readBannerPreference);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(BANNER_PREF_KEY, open ? 'open' : 'collapsed');
+    } catch {
+      /* 保存できない環境では何もしない */
+    }
+  }, [open]);
+
   const bgUrl = getSceneBackgroundUrl(sceneKey, game);
+  const hasBody = Boolean(children);
+
+  /* 見出し帯は画面全体でスクロール追従させたいので、余計な包み要素は作らない。 */
   return (
     <>
       <div className="scene-header-bar">
-        {eyebrow ? <p className="scene-eyebrow">{eyebrow}</p> : null}
-        {title ? <h2 className="scene-title">{title}</h2> : null}
-      </div>
-      <div className="scene-banner" style={{ backgroundImage: `url(${bgUrl})` }}>
-        <div className="scene-overlay">
-          {children}
+        <div className="scene-header-text">
+          {eyebrow ? <p className="scene-eyebrow">{eyebrow}</p> : null}
+          {title ? <h2 className="scene-title">{title}</h2> : null}
         </div>
+        {hasBody ? (
+          <button
+            type="button"
+            className="scene-toggle"
+            onClick={() => setOpen(prev => !prev)}
+            aria-expanded={open}
+            title={open ? '担当者パネルを畳んで作業領域を広げる' : '担当者パネルを開く'}
+          >
+            {open ? '担当者を畳む ▲' : '担当者を開く ▼'}
+          </button>
+        ) : null}
       </div>
+      {hasBody && open ? (
+        <div className="scene-banner" style={{ backgroundImage: `url(${bgUrl})` }}>
+          <div className="scene-overlay">
+            {children}
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -185,14 +225,86 @@ export function MetricGrid({ metrics }: { metrics: { label: string; value: strin
   );
 }
 
-export function Panel({ title, eyebrow, children }: { title: string; eyebrow?: string; children: ReactNode }) {
+/** 見出しをクリックすると本文を畳める区画。長い画面でも目的の項目へ素早く辿り着ける。 */
+export function Panel({
+  title,
+  eyebrow,
+  children,
+  defaultOpen = true,
+  className,
+}: {
+  title: string;
+  eyebrow?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <section>
-      {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-      <h2>{title}</h2>
-      {children}
-    </section>
+    <details
+      className={className ? `panel ${className}` : 'panel'}
+      open={open}
+      onToggle={event => setOpen(event.currentTarget.open)}
+    >
+      <summary className="panel-summary">
+        <span className="panel-summary-main">
+          {eyebrow ? <span className="eyebrow">{eyebrow}</span> : null}
+          <span className="panel-heading">{title}</span>
+        </span>
+        <span className="panel-chevron" aria-hidden="true" />
+      </summary>
+      <div className="panel-body">{children}</div>
+    </details>
   );
+}
+
+/** パネルの中でさらに項目を束ねる、小見出し付きの折りたたみ。 */
+export function Collapsible({
+  title,
+  children,
+  defaultOpen = true,
+  className,
+}: {
+  title: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <details
+      className={className ? `collapsible ${className}` : 'collapsible'}
+      open={open}
+      onToggle={event => setOpen(event.currentTarget.open)}
+    >
+      <summary className="collapsible-summary">
+        <span className="collapsible-title">{title}</span>
+        <span className="panel-chevron" aria-hidden="true" />
+      </summary>
+      <div className="collapsible-body">{children}</div>
+    </details>
+  );
+}
+
+/** 広い画面で左右2カラムに分けるレイアウト枠。狭い画面では自動的に1カラムへ戻る。 */
+export function ScreenColumns({
+  children,
+  variant = 'main-first',
+}: {
+  children: ReactNode;
+  variant?: 'main-first' | 'side-first' | 'even';
+}) {
+  return <div className={`screen-columns ${variant}`}>{children}</div>;
+}
+
+export function ScreenColumn({
+  children,
+  sticky = false,
+}: {
+  children: ReactNode;
+  sticky?: boolean;
+}) {
+  return <div className={sticky ? 'screen-col sticky' : 'screen-col'}>{children}</div>;
 }
 
 export function ProgressBar({ ratio, achieved }: { ratio: number; achieved: boolean }) {

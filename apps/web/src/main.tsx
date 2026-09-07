@@ -26,6 +26,7 @@ import {
 } from './components/icons';
 import { useGameStore, type ScreenId } from './store';
 import './style.css';
+import './layout.css';
 
 const navigation: { id: ScreenId; label: string; role: string; icon: typeof IconOffice }[] = [
   { id: 'office', label: '社長室', role: '経営者', icon: IconOffice },
@@ -293,6 +294,11 @@ function App() {
   const screen = useGameStore(store => store.screen);
   const setScreen = useGameStore(store => store.setScreen);
   const quit = useGameStore(store => store.quitToTitle);
+
+  // 拠点を移ったときは必ず画面の先頭から読み始められるようにする。
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [screen]);
 
   if (!game) return <Title />;
 

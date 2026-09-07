@@ -1,0 +1,334 @@
+/* ==========================================================
+   レイアウト改善レイヤー（style.css の後に読み込む）
+   ・トップメニューを圧縮して作業領域を広げる
+   ・広い画面では左右2カラムにして一覧性を上げる
+   ・各区画を折りたためるようにする
+   ========================================================== */
+
+/* --- 作業領域を広く取る --- */
+:root { --main-pad-x: 16px; }
+main { max-width: 1600px; padding: 12px var(--main-pad-x) 40px; }
+header { padding-bottom: 2px; }
+
+/* 固定ヘッダーは本文の左右余白いっぱいまで広げる（横スクロールを出さない） */
+@media (max-width: 768px) {
+  .game-sticky-header {
+    margin-left: calc(var(--main-pad-x) * -1);
+    margin-right: calc(var(--main-pad-x) * -1);
+    padding-left: var(--main-pad-x);
+    padding-right: var(--main-pad-x);
+  }
+}
+
+/* --- 固定ヘッダー（PC）の圧縮 --- */
+@media (min-width: 769px) {
+  .game-sticky-header {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  .topbar { padding: 7px 14px; gap: 4px 16px; }
+  .topbar-info .company { font-size: .92rem; letter-spacing: .04em; }
+  .topbar-info .date { font-size: 1rem; }
+
+  .topbar-metrics { gap: 2px 16px; }
+  .topbar-metrics dt { font-size: .66rem; line-height: 1.3; }
+  .topbar-metrics dd { font-size: .9rem; line-height: 1.3; }
+  .topbar-metric-cash dd { font-size: .95rem; }
+
+  .topbar-actions-desktop button {
+    min-height: 30px;
+    padding: 4px 10px;
+    font-size: .82rem;
+  }
+
+  /* 拠点ナビは2段組みをやめて1行に収め、高さを半分にする */
+  .nav-desktop { gap: 4px; margin-top: 5px; }
+  button.nav {
+    flex-direction: row;
+    align-items: center;
+    gap: 7px;
+    min-height: 32px;
+    padding: 3px 10px;
+  }
+  .nav-title-line { font-size: .9rem; }
+  button.nav small { display: inline; font-size: .68rem; line-height: 1; }
+}
+
+/* --- 拠点ヘッダー（担当者バナー）は畳めるようにする --- */
+.scene-header-bar {
+  margin-top: 10px;
+  padding: 7px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.scene-header-text {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.scene-eyebrow { margin: 0; }
+.scene-title { font-size: 1.1rem; }
+
+.scene-toggle {
+  flex: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4efe0;
+  border: 1px solid #6f8a7a;
+  min-height: 26px;
+  padding: 2px 10px;
+  font-size: .74rem;
+  font-weight: 700;
+  box-shadow: none;
+  white-space: nowrap;
+}
+.scene-toggle:hover { background: rgba(255, 255, 255, 0.24); }
+
+.scene-overlay { padding: 12px 16px; gap: 6px; }
+.scene-overlay .executive { margin-bottom: 0; }
+.scene-overlay .metrics { margin: 6px 0 0; }
+.scene-overlay p { margin: 0; }
+.scene-overlay .command-banner { margin: 8px 0 0; }
+
+/* --- 折りたたみ区画（Panel） --- */
+.panel {
+  margin-top: 12px;
+  background: #fffdf7;
+  border: 1px solid #b7beaf;
+  border-top: 5px solid #3c5448;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+.panel > .panel-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+  list-style: none;
+  background: #f4f0e2;
+  user-select: none;
+}
+.panel > .panel-summary::-webkit-details-marker { display: none; }
+.panel > .panel-summary::marker { content: ''; }
+.panel > .panel-summary:hover { background: #eae7d6; }
+.panel > .panel-summary:focus-visible { outline: 3px solid #a34d27; outline-offset: -3px; }
+.panel[open] > .panel-summary { border-bottom: 1px solid #e2ddd0; }
+
+.panel-summary-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.panel-summary .eyebrow { margin: 0; font-size: .7rem; color: #6b7264; }
+.panel-heading { font-size: 1.04rem; font-weight: 700; color: #1e332c; }
+
+.panel-chevron { flex: none; }
+.panel-chevron::before { content: '▼'; font-size: .68rem; color: #5e6456; }
+.panel:not([open]) > .panel-summary .panel-chevron::before { content: '▶'; }
+
+.panel-body { padding: 12px 16px 14px; overflow-x: auto; }
+.panel-body > :first-child { margin-top: 0; }
+.panel-body > p:first-child { margin-top: 0; }
+.panel-body table { margin-top: 4px; }
+/* 幅の狭いカラムでも表の操作ボタンが3行に折れないようにする */
+.panel-body table button { white-space: nowrap; }
+.panel-body thead th { white-space: nowrap; }
+.panel-body th, .panel-body td { padding: 7px 5px; }
+/* 進行状況の1行はヘッダーの日付ほど大きくする必要がない */
+.panel-body .date { font-size: 1.05rem; margin: 8px 0; }
+
+/* --- パネル内の小折りたたみ（Collapsible） --- */
+.collapsible { margin-top: 10px; border-left: 4px solid #8f9888; background: #faf7ec; }
+.collapsible-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.collapsible-summary::-webkit-details-marker { display: none; }
+.collapsible-summary::marker { content: ''; }
+.collapsible-summary:hover { background: #f2eee0; }
+.collapsible-summary:focus-visible { outline: 3px solid #a34d27; outline-offset: -3px; }
+.collapsible-title { font-weight: 700; font-size: .92rem; color: #354a43; }
+.collapsible-body { padding: 4px 10px 10px; }
+
+/* --- 左右2カラムレイアウト --- */
+.screen-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-top: 12px;
+}
+.screen-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.screen-col > .panel { margin-top: 0; }
+.screen-col > .actions { margin: 0; }
+
+@media (min-width: 1100px) {
+  .screen-columns { gap: 16px; }
+  .screen-columns.main-first { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+  .screen-columns.side-first { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+  .screen-columns.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+  /* 片側を画面に貼り付けて、もう片側を操作しても常に見えるようにする */
+  .screen-col.sticky {
+    position: sticky;
+    top: calc(var(--sticky-header-height, 0px) + 52px);
+    align-self: start;
+    max-height: calc(100vh - var(--sticky-header-height, 0px) - 70px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+}
+
+/* --- NPCのひとこと（旧インラインスタイルの共通化） --- */
+.npc-callout {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: #f5f1e5;
+  border-left: 4px solid #758171;
+}
+.npc-callout p { margin: 0; font-size: .84rem; color: #4a5148; }
+
+/* ==========================================================
+   開発会議：機能を選ぶ横で、出席者の反応が常に見える
+   ========================================================== */
+.attendee-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.attendee-tally span {
+  padding: 2px 8px;
+  border: 1px solid #c9c4b3;
+  background: #f5f1e5;
+  font-variant-numeric: tabular-nums;
+}
+.attendee-tally .tone-positive { color: #2f6b45; border-color: #a8c7b0; background: #f1f7ee; }
+.attendee-tally .tone-neutral { color: #6b7264; }
+.attendee-tally .tone-concern { color: #8c6a12; border-color: #ddc98a; background: #fbf5e6; }
+.attendee-tally .tone-objection { color: #8c3a12; border-color: #dcae94; background: #fbeee6; }
+
+.attendee-row-list { display: flex; flex-direction: column; gap: 8px; }
+
+.attendee-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: #fdfbf5;
+  border: 1px solid #c9c4b3;
+  border-left: 5px solid #758171;
+}
+.attendee-row.tone-positive { border-left-color: #2f6b45; background: #f4f8f0; }
+.attendee-row.tone-concern { border-left-color: #b8860b; background: #fdf8ea; }
+.attendee-row.tone-objection { border-left-color: #8c3a12; background: #fdf1ea; }
+
+.attendee-row-body { min-width: 0; flex: 1; }
+.attendee-row-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0;
+  font-weight: 700;
+  font-size: .92rem;
+  line-height: 1.5;
+}
+.attendee-row-name .role { font-size: .72rem; font-weight: 400; color: #5e6456; }
+.attendee-row .meeting-tone-badge { margin: 0; font-size: .74rem; }
+.attendee-row .meeting-attendee-comment { margin: 2px 0 0; font-size: .84rem; line-height: 1.55; }
+
+.dev-spec .metrics { gap: 6px 18px; }
+.dev-spec .metrics div { min-width: 96px; }
+
+.feature-cap-note { margin: 0 0 6px; font-size: .86rem; }
+.feature-group-count { margin-left: 8px; font-size: .74rem; font-weight: 400; color: #6b7264; }
+
+.feature-option-list { gap: 6px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.feature-option { padding: 6px 8px; line-height: 1.5; }
+.feature-option-name { font-size: .86rem; }
+.feature-option-desc { font-size: .76rem; line-height: 1.45; }
+.feature-option-stats { font-size: .72rem; line-height: 1.4; }
+
+.meeting-decision-actions { flex-wrap: wrap; gap: 8px; }
+.meeting-decision-actions button { flex: 1 1 auto; justify-content: center; }
+
+/* 狭い画面では1カラムに戻すが、反応パネルは機能選択の間もずっと画面上部に貼り付ける。
+   そのため2カラムの入れ物を解除し、パネル同士を同じ流れに並べ直す。 */
+@media (max-width: 1099px) {
+  .screen-columns { display: flex; flex-direction: column; gap: 12px; }
+  .screen-col { display: contents; }
+  .screen-col > .panel { margin-top: 0; }
+  .screen-col > .actions { margin: 0; }
+
+  /* 1カラム時の読み順は「反応 → 機能を選ぶ → 見込み → 決定」に整える */
+  .panel.dev-reactions { order: 1; }
+  .panel.dev-features { order: 2; }
+  .panel.dev-spec { order: 3; }
+  .meeting-decision-actions { order: 4; }
+
+  .panel.dev-reactions {
+    position: sticky;
+    top: calc(var(--sticky-header-height, 0px) + 44px);
+    z-index: 60;
+    box-shadow: 0 6px 14px rgba(37, 60, 54, 0.22);
+  }
+  .panel.dev-reactions > .panel-body {
+    max-height: 34vh;
+    overflow-y: auto;
+  }
+}
+
+/* --- 役員会議・図鑑などのカード群を少し詰める --- */
+.proposals-grid { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 4px; }
+.proposal-card { padding: 12px; gap: 8px; }
+/* カードの高さが揃うよう、決裁ボタンは常にカード下端へ寄せる */
+.proposal-body { display: flex; flex-direction: column; flex: 1; }
+.proposal-actions button { flex: 1 1 auto; justify-content: center; }
+.archive-grid { gap: 12px; margin-top: 4px; }
+.news-board { gap: 10px; }
+.reports { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.meeting-header { gap: 10px; }
+.meeting-lead { padding: 8px 12px; }
+.meeting-president-card { padding: 8px 12px; }
+
+/* --- 狭小画面の調整 --- */
+@media (max-width: 640px) {
+  :root { --main-pad-x: 8px; }
+  main { padding: 10px var(--main-pad-x) 36px; }
+  .scene-header-bar { margin-top: 8px; padding: 6px 10px; gap: 8px; }
+  .scene-title { font-size: 1rem; }
+  .scene-toggle { font-size: .7rem; padding: 2px 6px; min-height: 24px; }
+  .scene-overlay { padding: 10px 12px; }
+
+  .panel > .panel-summary { padding: 8px 10px; }
+  .panel-heading { font-size: .98rem; }
+  .panel-body { padding: 10px; }
+  .screen-columns { gap: 10px; margin-top: 10px; }
+  .screen-col { gap: 10px; }
+  .npc-callout { padding: 8px 10px; }
+}

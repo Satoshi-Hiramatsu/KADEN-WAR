@@ -23,7 +23,8 @@ async function capture() {
     await page.goto(BASE_URL, { waitUntil: 'networkidle' });
 
     // 1. タイトル画面
-    await page.getByRole('heading', { name: '家電戦争', exact: true }).waitFor();
+    // ロゴは「家電」「戦争」の2要素に分かれており、間に空白が入るため完全一致では引けない
+    await page.getByRole('heading', { name: /家電\s*戦争/ }).waitFor();
     await page.screenshot({ path: `${OUTPUT_DIR}/01-title.png` });
     console.log('Captured: 01-title.png');
 
@@ -49,9 +50,20 @@ async function capture() {
     if (await researchBtn.isVisible()) {
       await researchBtn.click();
     }
-    const devBtn = page.getByRole('button', { name: 'この設計で開発を始める' });
-    if (await devBtn.isVisible()) {
-      await devBtn.click();
+
+    // 3-2. 開発会議（付加価値項目の選択と出席者の反応）
+    const meetingBtn = page.getByRole('button', { name: 'この設計で開発会議にかける' });
+    if (await meetingBtn.isVisible()) {
+      await meetingBtn.click();
+      await page.locator('.attendee-row').first().waitFor();
+      const features = page.locator('.feature-option input:not([disabled])');
+      await features.nth(0).check();
+      await features.nth(2).check();
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${OUTPUT_DIR}/10-development-meeting.png` });
+      console.log('Captured: 10-development-meeting.png');
+      await page.getByRole('button', { name: /この内容で開発を始める|反対を押し切って開発を始める/ }).click();
+      await page.waitForTimeout(300);
     }
 
     // 4. 工場
