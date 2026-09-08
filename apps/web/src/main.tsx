@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { findCategory } from '../../../packages/content/src/categories';
+import { findFeature } from '../../../packages/content/src/features';
 import { economyRules } from '../../../packages/content/src/rules';
-import { formatBrand, formatMoney } from '../../../packages/simulation/src/money';
+import { formatBrand, formatMoney, formatUnitPrice } from '../../../packages/simulation/src/money';
 import { currentDate, goalProgress, scenarioProgress } from '../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../packages/simulation/src/types';
 import { DevelopmentMeeting } from './screens/DevelopmentMeeting';
@@ -132,6 +134,23 @@ function StickyHeader({
           </button>
         </div>
       </div>
+
+      {game.company.projects.length > 0 ? (
+        <div className="dev-progress-banner" role="status">
+          <span className="dev-progress-label">新製品開発中</span>
+          <ul className="dev-progress-list">
+            {game.company.projects.map(project => (
+              <li key={project.id}>
+                <strong>{project.name}</strong>
+                <span>残り{project.remainingWeeks}週</span>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="link dev-progress-link" onClick={() => handleScreenChange('lab')}>
+            研究所へ
+          </button>
+        </div>
+      ) : null}
 
       {/* PC向け常時表示ナビゲーション */}
       <nav className="nav-desktop" aria-label="拠点">
@@ -265,6 +284,53 @@ function FundsDialog({ game }: { game: GameState }) {
   );
 }
 
+function CompletionNotice() {
+  const products = useGameStore(store => store.completionNotice);
+  const dismiss = useGameStore(store => store.dismissCompletionNotice);
+  const setScreen = useGameStore(store => store.setScreen);
+  if (!products || products.length === 0) return null;
+  return (
+    <div className="completion-notice" role="alertdialog" aria-label="開発完了">
+      <h2>開発完了：新製品が完成しました！</h2>
+      {products.map(product => {
+        const category = findCategory(product.categoryId);
+        const features = product.featureIds
+          .map(id => findFeature(id))
+          .filter((feature): feature is NonNullable<typeof feature> => Boolean(feature));
+        return (
+          <div key={product.id} className="completion-product">
+            <h3>
+              {product.name}
+              <small>（{category?.name ?? product.categoryId}）</small>
+            </h3>
+            <dl className="completion-spec">
+              <div><dt>性能</dt><dd>{product.performance}</dd></div>
+              <div><dt>消費電力指数</dt><dd>{product.energy}</dd></div>
+              <div><dt>製造原価</dt><dd>{formatUnitPrice(product.unitCost)}</dd></div>
+              <div><dt>参考販売価格</dt><dd>{formatUnitPrice(product.price)}</dd></div>
+              <div><dt>先進性 / 目新しさ / 実用性</dt><dd>{product.advancement} / {product.novelty} / {product.practicality}</dd></div>
+            </dl>
+            {features.length > 0 ? (
+              <>
+                <p className="completion-features-label">搭載した付加価値項目</p>
+                <ul className="completion-features">
+                  {features.map(feature => <li key={feature.id}>{feature.name}</li>)}
+                </ul>
+              </>
+            ) : null}
+          </div>
+        );
+      })}
+      <p>工場で生産量を、販売本部で価格と発売を決めてください。</p>
+      <div className="actions">
+        <button onClick={() => { dismiss(); setScreen('factory'); }}>工場で生産を計画する</button>
+        <button className="secondary" onClick={() => { dismiss(); setScreen('sales'); }}>販売本部で発売準備する</button>
+        <button className="link" onClick={dismiss}>閉じる</button>
+      </div>
+    </div>
+  );
+}
+
 function Result({ game }: { game: GameState }) {
   const quit = useGameStore(store => store.quitToTitle);
   const goals = goalProgress(game);
@@ -316,6 +382,7 @@ function App() {
       />
       <Notice />
       <FundsDialog game={game} />
+      <CompletionNotice />
       {game.status !== 'playing' ? <Result game={game} /> : null}
       {screen === 'office' ? <Office game={game} /> : null}
       {screen === 'meeting' ? <Meeting game={game} /> : null}

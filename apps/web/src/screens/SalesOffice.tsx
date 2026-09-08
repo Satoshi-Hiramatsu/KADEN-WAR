@@ -1,11 +1,12 @@
-import { adCampaigns } from '../../../../packages/content/src/advertising';
+import { useState } from 'react';
+import { adCampaigns, findAdCampaign, type AdCampaignId } from '../../../../packages/content/src/advertising';
 import { channels } from '../../../../packages/content/src/channels';
 import { categories, findCategory, demandUnitsAt, unitsFromWorkload } from '../../../../packages/content/src/categories';
 import { weeksPerYear } from '../../../../packages/content/src/rules';
 import { formatBasisAsPercent, formatMoney, formatUnitPrice, formatUnits } from '../../../../packages/simulation/src/money';
-import { channelCapacityWorkload } from '../../../../packages/simulation/src/market';
+import { channelCapacityWorkload, forecastProductAtPrice } from '../../../../packages/simulation/src/market';
 import { departmentReports, marketForecast } from '../../../../packages/simulation/src/selectors';
-import type { GameState } from '../../../../packages/simulation/src/types';
+import type { GameState, Product } from '../../../../packages/simulation/src/types';
 import {
   ExecutiveHeader,
   MetricGrid,
@@ -66,6 +67,7 @@ export function SalesOffice({ game }: { game: GameState }) {
             <tbody>
               {products.map(product => {
                 const category = findCategory(product.categoryId);
+                const priceForecast = forecastProductAtPrice(game, product.id, product.price);
                 return (
                   <tr key={product.id}>
                     <th scope="row">
@@ -94,6 +96,14 @@ export function SalesOffice({ game }: { game: GameState }) {
                         標準 {formatUnitPrice(category?.referencePrice ?? 0)}
                         ／販売能力 {category ? formatUnits(unitsFromWorkload(category, salesWorkload)) : 0}台/週
                       </small>
+                      {priceForecast ? (
+                        <small className="price-forecast">
+                          この価格なら想定 <strong>{formatUnits(priceForecast.sellableUnits)}台/週</strong>
+                          （占有率{formatBasisAsPercent(priceForecast.shareBasis)}）
+                          ・売上{formatMoney(priceForecast.revenue)}
+                          ・粗利{formatMoney(priceForecast.grossProfit)}
+                        </small>
+                      ) : null}
                     </td>
                     <td>
                       {formatUnits(product.lastWeekUnitsSold)}台
@@ -122,8 +132,13 @@ export function SalesOffice({ game }: { game: GameState }) {
             </tbody>
           </table>
         )}
-        <small>価格の編集はこの画面に一本化しています。市場の標準価格より安いほど売れやすく、利益は薄くなります。</small>
+        <small>
+          価格の編集はこの画面に一本化しています。市場の標準価格より安いほど売れやすく、利益は薄くなります。
+          「この価格なら想定」は、今すぐこの価格で発売した場合の目安です（在庫・生産計画の制約は含みません）。
+        </small>
       </Panel>
+
+      <PricingStrategyPanel game={game} products={products} salesWorkload={salesWorkload} currentYear={currentYear} />
 
       <ScreenColumns variant="side-first">
         <ScreenColumn>
@@ -274,5 +289,101 @@ export function SalesOffice({ game }: { game: GameState }) {
         </div>
       </Panel>
     </>
+  );
+}
+
+const priceScenarios: { label: string; delta: number }[] = [
+  { label: '-20%', delta: -0.2 },
+  { label: '-10%', delta: -0.1 },
+  { label: '現在の価格', delta: 0 },
+  { label: '+10%', delta: 0.1 },
+  { label: '+20%', delta: 0.2 },
+];
+
+type AdScenarioId = 'current' | 'none' | AdCampaignId;
+
+/** 価格帯・広告条件を変えたときの見込みをその場で比較する、実際には反映されない試算パネル。 */
+function PricingStrategyPanel({
+  game,
+  products,
+  salesWorkload,
+  currentYear,
+}: {
+  game: GameState;
+  products: Product[];
+  salesWorkload: number;
+  currentYear: number;
+}) {
+  const [productId, setProductId] = useState(products[0]?.id ?? '');
+  const [adScenario, setAdScenario] = useState<AdScenarioId>('current');
+  const product = products.find(candidate => candidate.id === productId) ?? products[0];
+
+  if (!product) {
+    return (
+      <Panel eyebrow="01.5 / 戦略検討" title="価格・広告シミュレーター">
+        <p>製品ができたら、価格帯や広告条件を変えたときの見込みをここで比較できます。</p>
+      </Panel>
+    );
+  }
+
+  const category = findCategory(product.categoryId);
+  const advertisingBoostBasisOverride = adScenario === 'current'
+    ? undefined
+    : adScenario === 'none'
+      ? 0
+      : findAdCampaign(adScenario)?.boostBasis ?? 0;
+
+  return (
+    <Panel eyebrow="01.5 / 戦略検討" title="価格・広告シミュレーター">
+      <p>価格を変えたとき、広告を打ったときにどれだけ変わるかをその場で試算します。ここで選んでも実際の価格・広告には反映されません。</p>
+      <div className="actions strategy-controls">
+        <label className="field">
+          <span>比較する製品</span>
+          <select value={product.id} onChange={event => setProductId(event.target.value)}>
+            {products.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>広告条件の仮定</span>
+          <select value={adScenario} onChange={event => setAdScenario(event.target.value as AdScenarioId)}>
+            <option value="current">
+              現状のまま{game.company.advertising.boostWeeksRemaining > 0 ? '（実施中）' : '（未実施）'}
+            </option>
+            <option value="none">広告なしと仮定</option>
+            {adCampaigns.filter(campaign => campaign.availableFrom <= currentYear).map(campaign => (
+              <option key={campaign.id} value={campaign.id}>
+                {campaign.name}を打つと仮定（需要+{Math.round(campaign.boostBasis / 100)}%）
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <table>
+        <thead>
+          <tr><th>価格帯</th><th>価格</th><th>占有率</th><th>想定販売台数</th><th>想定売上</th><th>想定粗利</th></tr>
+        </thead>
+        <tbody>
+          {priceScenarios.map(scenario => {
+            const price = Math.max(1, Math.round(product.price * (1 + scenario.delta)));
+            const result = forecastProductAtPrice(game, product.id, price, advertisingBoostBasisOverride);
+            return (
+              <tr key={scenario.label} className={scenario.delta === 0 ? 'own' : undefined}>
+                <th scope="row">{scenario.label}</th>
+                <td>{formatUnitPrice(price)}</td>
+                <td>{result ? formatBasisAsPercent(result.shareBasis) : '-'}</td>
+                <td>{result ? `${formatUnits(result.sellableUnits)}台` : '-'}</td>
+                <td>{result ? formatMoney(result.revenue) : '-'}</td>
+                <td>{result ? formatMoney(result.grossProfit) : '-'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <small>
+        標準価格{category ? formatUnitPrice(category.referencePrice) : '-'}
+        ／販売能力{category ? formatUnits(unitsFromWorkload(category, salesWorkload)) : 0}台/週を踏まえた試算です。
+        在庫や生産計画の上限は考慮していません。
+      </small>
+    </Panel>
   );
 }

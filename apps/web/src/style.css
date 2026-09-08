@@ -103,6 +103,40 @@ button.link {
 .funds { margin-top: 14px; padding: 18px; background: #fff6ec; border: 2px solid #a34d27; }
 .funds h2 { color: #8c3a12; }
 
+/* 新製品開発中バナー */
+.dev-progress-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  margin-top: 8px; padding: 8px 16px;
+  background: #fff3d6; border: 1px solid #d8ac3f; border-left: 6px solid #c98a1c;
+  color: #5a4109;
+}
+.dev-progress-label {
+  font-weight: 700; font-size: .82rem; letter-spacing: .04em;
+  background: #c98a1c; color: #fffdf5; padding: 3px 10px; flex: none;
+}
+.dev-progress-list { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; padding: 0; list-style: none; flex: 1; }
+.dev-progress-list li { display: flex; align-items: baseline; gap: 6px; }
+.dev-progress-list strong { font-size: .92rem; }
+.dev-progress-list span { font-size: .8rem; color: #7a5c12; font-variant-numeric: tabular-nums; }
+.dev-progress-link { flex: none; }
+
+/* 開発完了・最終スペック */
+.completion-notice {
+  margin-top: 14px; padding: 20px; background: #f2f9ee; border: 2px solid #2f6b45;
+}
+.completion-notice h2 { color: #204a2f; }
+.completion-product { margin-top: 14px; padding-top: 14px; border-top: 1px dashed #b7beaf; }
+.completion-product:first-of-type { margin-top: 8px; padding-top: 0; border-top: none; }
+.completion-product h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.completion-product h3 small { display: inline; margin-left: 6px; color: #5e6456; font-weight: 400; }
+.completion-spec { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; }
+.completion-spec div { display: flex; flex-direction: column; }
+.completion-spec dt { font-size: .72rem; color: #5e6456; }
+.completion-spec dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.completion-features-label { margin: 10px 0 4px; font-weight: 700; font-size: .82rem; }
+.completion-features { margin: 0; padding-left: 1.2em; }
+.completion-features li { font-size: .88rem; }
+
 /* 担当者肖像 */
 .executive { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 12px; }
 .executive > div { flex: 1; min-width: 0; }
@@ -150,6 +184,12 @@ input, select {
 }
 input[type="number"] { width: 120px; }
 .field .suffix { font-size: .85rem; color: #4a5148; }
+.strategy-controls { align-items: flex-end; }
+.strategy-controls .field { flex-direction: column; align-items: flex-start; gap: 4px; }
+.strategy-controls .field > span:first-child { min-width: auto; }
+
+.price-forecast { color: #2f6b45; margin-top: 4px; }
+.price-forecast strong { color: #1e332c; }
 .design-form { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .module-note { font-size: .85rem; color: #4a5148; margin-top: 8px; }
 .tech-list { font-size: .85rem; color: #4a5148; }
@@ -407,6 +447,8 @@ input[type="number"] { width: 120px; }
   main { padding: 14px 10px 40px; }
   section { padding: 14px 12px; }
   .topbar { padding: 12px 12px; }
+  .dev-progress-banner { flex-direction: column; align-items: flex-start; padding: 8px 12px; }
+  .dev-progress-list { flex-direction: column; gap: 4px; }
   .field > span:first-child { min-width: 100%; }
   table { display: block; overflow-x: auto; }
   .news-card-hero { flex-direction: column; }

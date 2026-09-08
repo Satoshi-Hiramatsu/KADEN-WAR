@@ -3,7 +3,7 @@ import type { CategoryId } from '../../../packages/content/src/categories';
 import { applyCommand, type Command } from '../../../packages/simulation/src/commands';
 import { createGame } from '../../../packages/simulation/src/setup';
 import { advanceWeeks } from '../../../packages/simulation/src/week';
-import type { GameState } from '../../../packages/simulation/src/types';
+import type { GameState, Product } from '../../../packages/simulation/src/types';
 
 export type ScreenId =
   | 'title' | 'office' | 'meeting' | 'lab' | 'developmentMeeting'
@@ -25,6 +25,8 @@ export type GameStore = {
   screen: ScreenId;
   notice: { kind: 'info' | 'error'; text: string } | null;
   fundsPrompt: FundsPrompt | null;
+  /** 開発完了した製品。完了案内・最終スペック表示のため一時的に保持する。 */
+  completionNotice: Product[] | null;
   developmentDraft: DevelopmentDraft | null;
   startGame: (options: { companyName: string; seed: number }) => void;
   quitToTitle: () => void;
@@ -33,6 +35,7 @@ export type GameStore = {
   advance: (weeks: number, allowShortfall?: boolean) => void;
   dismissNotice: () => void;
   dismissFundsPrompt: () => void;
+  dismissCompletionNotice: () => void;
   setDevelopmentDraft: (draft: DevelopmentDraft) => void;
   updateDevelopmentFeatureIds: (featureIds: string[]) => void;
   clearDevelopmentDraft: () => void;
@@ -43,14 +46,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   screen: 'title',
   notice: null,
   fundsPrompt: null,
+  completionNotice: null,
   developmentDraft: null,
 
   startGame: ({ companyName, seed }) => {
     const game = createGame({ scenarioId: 'SC01', seed, companyName });
-    set({ game, screen: 'office', notice: null, fundsPrompt: null });
+    set({ game, screen: 'office', notice: null, fundsPrompt: null, completionNotice: null });
   },
 
-  quitToTitle: () => set({ game: null, screen: 'title', notice: null, fundsPrompt: null }),
+  quitToTitle: () => set({ game: null, screen: 'title', notice: null, fundsPrompt: null, completionNotice: null }),
 
   setScreen: screen => set({ screen }),
 
@@ -78,11 +82,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
       return;
     }
-    set({ game: result.state, fundsPrompt: null, notice: null });
+    set(store => ({
+      game: result.state,
+      fundsPrompt: null,
+      notice: null,
+      completionNotice: result.completedProducts.length > 0
+        ? [...(store.completionNotice ?? []), ...result.completedProducts]
+        : store.completionNotice,
+    }));
   },
 
   dismissNotice: () => set({ notice: null }),
   dismissFundsPrompt: () => set({ fundsPrompt: null }),
+  dismissCompletionNotice: () => set({ completionNotice: null }),
 
   setDevelopmentDraft: draft => set({ developmentDraft: draft }),
   updateDevelopmentFeatureIds: featureIds => set(store => (

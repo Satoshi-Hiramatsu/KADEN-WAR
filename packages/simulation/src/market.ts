@@ -1,9 +1,10 @@
-import { categories, demandUnitsAt, findCategory, type CategoryId } from '../../content/src/categories';
+import { categories, demandUnitsAt, findCategory, unitsFromWorkload, type CategoryId } from '../../content/src/categories';
 import { channels, findChannel } from '../../content/src/channels';
 import { rivals, rivalJoinsSegment } from '../../content/src/rivals';
 import { calendarRules, economyRules, weeksPerYear } from '../../content/src/rules';
+import { amountFromUnits } from './money';
 import { nextInt } from './rng';
-import type { GameState, Product } from './types';
+import type { GameState, Money, Product } from './types';
 
 export type MarketEntry = {
   id: string;
@@ -171,4 +172,76 @@ export function evaluateMarket(state: GameState, options: { withNoise: boolean }
 
 export function categoryName(categoryId: string): string {
   return findCategory(categoryId)?.name ?? categoryId;
+}
+
+export type ProductForecast = {
+  categoryDemandUnits: number;
+  /** 万分率。 */
+  shareBasis: number;
+  /** 需要ベースの見込台数（販路の余力を考慮しない）。 */
+  unitsDemanded: number;
+  /** 販路の残り工数で実際にさばける上限を加味した、想定週次販売台数。 */
+  sellableUnits: number;
+  /** 想定週次売上（万円）。 */
+  revenue: Money;
+  /** 想定週次粗利（万円）。標準製造原価から概算。 */
+  grossProfit: Money;
+};
+
+/**
+ * ある製品を、指定した価格・広告条件で「今すぐ発売したら」という前提で試算する。
+ * 実際の状態は一切変更しない（在庫・生産計画・実際の発売状態には影響しない）。
+ * advertisingBoostBasisOverride を省略すると現在の広告状態をそのまま使い、
+ * 数値を渡すとその需要ブースト（0なら広告なし）を仮定して試算する。
+ */
+export function forecastProductAtPrice(
+  state: GameState,
+  productId: string,
+  price: number,
+  advertisingBoostBasisOverride?: number,
+): ProductForecast | null {
+  const product = state.company.products.find(candidate => candidate.id === productId);
+  if (!product) return null;
+  const category = findCategory(product.categoryId);
+  if (!category) return null;
+
+  const patchedState: GameState = {
+    ...state,
+    company: {
+      ...state.company,
+      products: state.company.products.map(candidate => (
+        candidate.id === productId
+          ? { ...candidate, price, onSale: true, releasedWeek: candidate.releasedWeek ?? state.week }
+          : candidate
+      )),
+      advertising: advertisingBoostBasisOverride === undefined
+        ? state.company.advertising
+        : {
+            activeCampaign: state.company.advertising.activeCampaign,
+            budget: state.company.advertising.budget,
+            boostWeeksRemaining: advertisingBoostBasisOverride > 0 ? 4 : 0,
+            boostBasis: advertisingBoostBasisOverride,
+          },
+    },
+  };
+
+  const evaluation = evaluateMarket(patchedState, { withNoise: false });
+  const market = evaluation.markets.find(candidate => candidate.categoryId === product.categoryId);
+  if (!market) return null;
+  const entry = market.entries.find(candidate => candidate.id === productId);
+  if (!entry) return null;
+
+  const sellableCap = unitsFromWorkload(category, channelCapacityWorkload(state));
+  const sellableUnits = Math.max(0, Math.min(entry.unitsDemanded, sellableCap));
+  const revenue = amountFromUnits(sellableUnits, price);
+  const cost = amountFromUnits(sellableUnits, product.unitCost);
+
+  return {
+    categoryDemandUnits: market.demandUnits,
+    shareBasis: entry.shareBasis,
+    unitsDemanded: entry.unitsDemanded,
+    sellableUnits,
+    revenue,
+    grossProfit: revenue - cost,
+  };
 }

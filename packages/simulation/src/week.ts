@@ -119,7 +119,7 @@ function runResearch(state: GameState): void {
   }
 }
 
-function runDevelopment(state: GameState): void {
+function runDevelopment(state: GameState): Product[] {
   const company = state.company;
   const finished: typeof company.projects = [];
   for (const project of company.projects) {
@@ -131,6 +131,7 @@ function runDevelopment(state: GameState): void {
     project.remainingWeeks = Math.max(0, project.remainingWeeks - 1);
     if (project.remainingWeeks === 0) finished.push(project);
   }
+  const completed: Product[] = [];
   for (const project of finished) {
     const category = findCategory(project.categoryId);
     const suggested = category
@@ -165,9 +166,11 @@ function runDevelopment(state: GameState): void {
     };
     company.nextProductNumber += 1;
     company.products.push(product);
+    completed.push(product);
     addLog(state, 'good', `開発完了：${project.name}。工場で生産量を、販売本部で価格と発売を決めてください。`);
   }
   company.projects = company.projects.filter(project => project.remainingWeeks > 0);
+  return completed;
 }
 
 function runProduction(state: GameState): { produced: number; defects: number } {
@@ -638,7 +641,7 @@ function updateArchiveAndMorale(state: GameState, netIncome: Money): void {
 /** 1週進める。必須支払いに現金が足りない場合は状態を変えずに中断する。 */
 export function advanceWeek(state: GameState, options: { allowShortfall?: boolean } = {}): AdvanceResult {
   if (state.status !== 'playing') {
-    return { ok: true, state, weeksAdvanced: 0, stopped: 'ゲームは終了しています。' };
+    return { ok: true, state, weeksAdvanced: 0, stopped: 'ゲームは終了しています。', completedProducts: [] };
   }
 
   const draft = cloneState(state);
@@ -655,7 +658,7 @@ export function advanceWeek(state: GameState, options: { allowShortfall?: boolea
   payCash(draft, { debit: 'sellingExpense', amount: channelWeeklyCost(draft), reason: '販路維持費', flow: 'operating' });
   payCash(draft, { debit: 'interestExpense', amount: weeklyInterestCost(draft), reason: '借入利息', flow: 'operating' });
 
-  runDevelopment(draft);
+  const completedProducts = runDevelopment(draft);
   runResearch(draft);
   const production = runProduction(draft);
   const sales = runSales(draft);
@@ -716,7 +719,7 @@ export function advanceWeek(state: GameState, options: { allowShortfall?: boolea
 
   evaluateScenario(draft);
 
-  return { ok: true, state: draft, weeksAdvanced: 1, stopped: null };
+  return { ok: true, state: draft, weeksAdvanced: 1, stopped: null, completedProducts };
 }
 
 /** 指定週数まで進める。開発完了・資金不足・勝敗で中断する。 */
@@ -727,6 +730,7 @@ export function advanceWeeks(
 ): AdvanceResult {
   let current = state;
   let advanced = 0;
+  const completedProducts: Product[] = [];
   for (let index = 0; index < weeks; index += 1) {
     const result = advanceWeek(current, options);
     if (!result.ok) {
@@ -734,9 +738,10 @@ export function advanceWeeks(
     }
     current = result.state;
     advanced += 1;
+    completedProducts.push(...result.completedProducts);
     if (current.status !== 'playing') {
-      return { ok: true, state: current, weeksAdvanced: advanced, stopped: current.outcome };
+      return { ok: true, state: current, weeksAdvanced: advanced, stopped: current.outcome, completedProducts };
     }
   }
-  return { ok: true, state: current, weeksAdvanced: advanced, stopped: null };
+  return { ok: true, state: current, weeksAdvanced: advanced, stopped: null, completedProducts };
 }

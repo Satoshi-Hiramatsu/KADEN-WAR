@@ -283,5 +283,5 @@ export type CommandResult =
   | { ok: false; error: string; state: GameState };
 
 export type AdvanceResult =
-  | { ok: true; state: GameState; weeksAdvanced: number; stopped: string | null }
+  | { ok: true; state: GameState; weeksAdvanced: number; stopped: string | null; completedProducts: Product[] }
   | { ok: false; state: GameState; kind: 'funds'; required: Money; cash: Money; weeksAdvanced: number };
