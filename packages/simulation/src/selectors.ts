@@ -17,7 +17,11 @@ import {
   weeklyInterestCost,
   weeklyLaborCost,
 } from './week';
-import type { GameState, Money, Product, ScenarioProgress } from './types';
+import {
+  factoryCapacityUtilization,
+  weeklyRequiredProductionCash,
+} from './production';
+import type { GameState, Money, Product, ScenarioProgress, SystemAlert } from './types';
 
 export type ReportMetric = { label: string; value: string; note?: string };
 
@@ -255,6 +259,15 @@ export function departmentReports(state: GameState): DepartmentReport[] {
           { label: '在庫評価額', value: formatMoney(balance.inventory) },
         );
         if (planned > capacity) warnings.push('計画が生産能力を超えています。');
+        const reqCash = weeklyRequiredProductionCash(state);
+        const availCash = Math.max(0, balance.cash - mandatoryWeeklyPayment(state));
+        if (reqCash > availCash && reqCash > 0) {
+          warnings.push(`生産資金が約${formatMoney(reqCash - availCash)}不足する見込みです。手元資金を増やすか生産計画を調整してください。`);
+        }
+        const util = factoryCapacityUtilization(state);
+        if (util > 0.85) {
+          warnings.push(`工場の稼働率が${Math.round(util * 100)}%に達しています。残業・負荷割増により生産単価が上昇しています。`);
+        }
         break;
       }
       case 'personnel': {
@@ -304,3 +317,97 @@ export function averageUnitCost(stockUnits: number, stockValue: Money): string {
   if (stockUnits <= 0) return '—';
   return formatUnitPrice(Math.round((stockValue * 10000) / stockUnits));
 }
+
+/**
+ * 画面上部に表示すべき全社アラートの一覧。
+ * 1. 【緊急（critical・赤文字）】先週の資金不足による生産停止/削減、全製品在庫切れによる販売ゼロ、未払金の発生
+ * 2. 【事前警告（warning・橙/黄）】次週の生産計画を満たすための現金不足（事前察知）、固定費不足
+ */
+export function getActiveAlerts(state: GameState): SystemAlert[] {
+  const alerts: SystemAlert[] = [];
+  const accounts = state.company.accounts;
+  const cash = accounts.cash;
+  const fixedCost = mandatoryWeeklyPayment(state);
+  const requiredProdCash = weeklyRequiredProductionCash(state);
+  const availableForProd = Math.max(0, cash - fixedCost);
+
+  // 1. 未払金（最優先の緊急）
+  if (accounts.payable > 0) {
+    const remaining = economyRules.maxGraceWeeks - state.company.graceWeeks;
+    alerts.push({
+      id: 'alert-payable',
+      level: 'critical',
+      title: `未払金${formatMoney(accounts.payable)}が発生しています`,
+      message: `資金ショートが発生しています（倒産猶予残り${remaining}週）。直ちに経理部で融資を受けるか、支出を圧縮してください。`,
+      actionScreen: 'finance',
+      actionLabel: '経理部で借入する',
+    });
+  }
+
+  // 2. 直近週の資金不足による生産停止・縮小（実績緊急）
+  const cashShortfalls = state.lastWeek?.productionShortfalls?.filter(s => s.reason === 'cash') ?? [];
+  if (cashShortfalls.length > 0) {
+    const zeroProducts = cashShortfalls.filter(s => s.actualUnits === 0);
+    if (zeroProducts.length > 0) {
+      const names = zeroProducts.map(p => p.productName).join('・');
+      alerts.push({
+        id: 'alert-prod-stopped',
+        level: 'critical',
+        title: `資金不足により「${names}」の生産が停止しました`,
+        message: `手元現金が足りず、製品を1台も製造できませんでした。店頭在庫が枯渇して販売機会を逃しています。経理部で借入を行うか、生産計画を見直してください。`,
+        actionScreen: 'finance',
+        actionLabel: '経理部で借入する',
+      });
+    } else {
+      const names = cashShortfalls.map(p => p.productName).join('・');
+      alerts.push({
+        id: 'alert-prod-reduced',
+        level: 'critical',
+        title: `資金不足により「${names}」の生産量が強制削減されました`,
+        message: `手元現金が足りないため、払える台数まで製造が自動削減されました。販売店での品切れリスクが高まっています。`,
+        actionScreen: 'finance',
+        actionLabel: '経理部で借入する',
+      });
+    }
+  }
+
+  // 3. 在庫枯渇による販売台数0（発売中製品があるのに在庫切れ）
+  const onSaleProducts = state.company.products.filter(p => p.onSale);
+  const totalStock = onSaleProducts.reduce((sum, p) => sum + p.stockUnits, 0);
+  if (onSaleProducts.length > 0 && totalStock === 0 && (state.lastWeek?.unitsSold ?? 0) === 0) {
+    alerts.push({
+      id: 'alert-zero-sales-stock',
+      level: 'critical',
+      title: '店頭在庫が0台になり、先週の販売台数が0台になりました',
+      message: '発売中製品の在庫が完全に底をついています。工場で生産を再開し、製品を店頭に届けてください。',
+      actionScreen: 'factory',
+      actionLabel: '工場で生産する',
+    });
+  }
+
+  // 4. 【事前警告】次週の固定費すら払えない
+  if (cash < fixedCost) {
+    alerts.push({
+      id: 'alert-fixed-cost-shortfall',
+      level: 'critical',
+      title: `手元現金（${formatMoney(cash)}）が次週の固定費（${formatMoney(fixedCost)}）を下回っています`,
+      message: `人件費や販路維持費が払えず、週送りが停止するか未払金が発生します。直ちに経理部で借入を行ってください。`,
+      actionScreen: 'finance',
+      actionLabel: '経理部で借入する',
+    });
+  } else if (requiredProdCash > 0 && availableForProd < requiredProdCash) {
+    // 5. 【事前察知】手元現金で生産計画を賄えない（事前予告）
+    const shortfall = requiredProdCash - availableForProd;
+    alerts.push({
+      id: 'alert-prod-cash-shortfall-forecast',
+      level: 'warning',
+      title: `手元現金が不足し、次週の生産計画を満たせません`,
+      message: `次週の固定費（${formatMoney(fixedCost)}）差引後の余力（${formatMoney(availableForProd)}）では、生産計画（必要${formatMoney(requiredProdCash)}）に対し約${formatMoney(shortfall)}不足します。このまま進めると生産が停止・削減され、在庫切れで売れなくなります。`,
+      actionScreen: 'finance',
+      actionLabel: '経理部で借入を検討',
+    });
+  }
+
+  return alerts;
+}
+

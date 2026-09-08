@@ -7,7 +7,13 @@ import {
   maxProductionUnitsFor,
   plannedProductionWorkload,
 } from '../../../../packages/simulation/src/selectors';
-import { defectBasis, productionCapacityWorkload } from '../../../../packages/simulation/src/week';
+import {
+  calculateEffectiveUnitCost,
+  factoryCapacityUtilization,
+  requiredCashForProduct,
+  weeklyRequiredProductionCash,
+} from '../../../../packages/simulation/src/production';
+import { defectBasis, mandatoryWeeklyPayment, productionCapacityWorkload } from '../../../../packages/simulation/src/week';
 import type { GameState } from '../../../../packages/simulation/src/types';
 import {
   ExecutiveHeader,
@@ -28,6 +34,12 @@ export function Factory({ game }: { game: GameState }) {
   const plannedWorkload = plannedProductionWorkload(game);
   const products = game.company.products;
   const currentYear = game.startYear + Math.floor(game.week / weeksPerYear);
+  const utilization = factoryCapacityUtilization(game);
+  const totalRequiredCash = weeklyRequiredProductionCash(game);
+  const cash = game.company.accounts.cash;
+  const fixedCost = mandatoryWeeklyPayment(game);
+  const availableCash = Math.max(0, cash - fixedCost);
+  const isCashShortfall = totalRequiredCash > availableCash && totalRequiredCash > 0;
 
   return (
     <>
@@ -39,10 +51,10 @@ export function Factory({ game }: { game: GameState }) {
             {
               label: '生産計画',
               value: `${formatUnits(plannedWorkload)}工数/週`,
-              note: `残り${formatUnits(Math.max(0, capacity - plannedWorkload))}工数`,
+              note: `稼働率${Math.round(utilization * 100)}%（残り${formatUnits(Math.max(0, capacity - plannedWorkload))}工数）`,
             },
+            { label: '必要製造資金', value: `${formatMoney(totalRequiredCash)}/週`, note: isCashShortfall ? '⚠️手元資金不足' : '資金内' },
             { label: '不良率', value: `${(defectBasis(game) / 100).toFixed(1)}%`, note: '週ごとにばらつく' },
-            { label: '設備', value: formatMoney(game.company.accounts.equipment), note: '簿価' },
           ]}
         />
       </SceneBanner>
@@ -54,11 +66,31 @@ export function Factory({ game }: { game: GameState }) {
               <p>生産できる製品がありません。研究所で製品を開発してください。</p>
             ) : (
               <>
+                {/* 製造資金の過不足サマリー */}
+                <div className={`production-finance-summary ${isCashShortfall ? 'has-shortfall' : 'is-ok'}`}>
+                  <div className="finance-summary-line">
+                    <span>週の必要製造資金: <strong>{formatMoney(totalRequiredCash)}</strong></span>
+                    <span className="finance-summary-sub">（次週の余力現金: {formatMoney(availableCash)} / 手元現金: {formatMoney(cash)}）</span>
+                  </div>
+                  {isCashShortfall ? (
+                    <div className="finance-shortfall-alert">
+                      ⚠️ 次週の製造資金が約<strong>{formatMoney(totalRequiredCash - availableCash)}</strong>不足しています！このままでは週送り時に製造が自動削減・停止されます。経理部で借入を行うか計画を調整してください。
+                    </div>
+                  ) : null}
+                </div>
+
                 {/* PC/タブレット用テーブル表示 */}
                 <div className="desktop-table-wrap">
                   <table>
                     <thead>
-                      <tr><th>製品</th><th>1台の工数</th><th>標準原価</th><th>在庫</th><th>在庫平均原価</th><th>週の生産量</th></tr>
+                      <tr>
+                        <th>製品</th>
+                        <th>1台の工数</th>
+                        <th>生産単価（実効原価）</th>
+                        <th>在庫</th>
+                        <th>在庫平均原価</th>
+                        <th>週の生産量・必要資金</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {products.map(product => {
@@ -66,6 +98,9 @@ export function Factory({ game }: { game: GameState }) {
                         const per100 = category?.workloadPer100Units ?? 0;
                         const usedWorkload = category ? workloadForUnits(category, product.productionPlan) : 0;
                         const maxUnits = maxProductionUnitsFor(game, product);
+                        const costCalc = calculateEffectiveUnitCost(product, product.productionPlan, utilization);
+                        const reqCash = requiredCashForProduct(product, product.productionPlan, utilization);
+                        const lastShortfall = game.lastWeek?.productionShortfalls?.find(s => s.productId === product.id);
                         return (
                           <tr key={product.id}>
                             <th scope="row">
@@ -78,7 +113,26 @@ export function Factory({ game }: { game: GameState }) {
                               </div>
                             </th>
                             <td>{per100}工数/100台</td>
-                            <td>{formatUnitPrice(product.unitCost)}</td>
+                            <td>
+                              <div className="unit-cost-cell">
+                                <strong>{formatUnitPrice(costCalc.effectiveUnitCost)}</strong>
+                                {costCalc.isSmallLotPenalty ? (
+                                  <span className="cost-tag penalty" title="小ロットのため段取り固定費の負担が大きく割高です">
+                                    +{costCalc.deltaPercent}% 小ロット割高
+                                  </span>
+                                ) : costCalc.isVolumeDiscount ? (
+                                  <span className="cost-tag discount" title="まとまった数量のため段取り固定費が希釈され部材割引も効いています">
+                                    {costCalc.deltaPercent}% 量産効果
+                                  </span>
+                                ) : null}
+                                {costCalc.isOvertimePenalty ? (
+                                  <span className="cost-tag overtime" title="工場稼働率85%超による残業割増が発生しています">
+                                    ⏰残業割増
+                                  </span>
+                                ) : null}
+                                <small className="cost-base-ref">基準: {formatUnitPrice(product.unitCost)}</small>
+                              </div>
+                            </td>
                             <td>{formatUnits(product.stockUnits)}台</td>
                             <td>{averageUnitCost(product.stockUnits, product.stockValue)}</td>
                             <td>
@@ -91,8 +145,9 @@ export function Factory({ game }: { game: GameState }) {
                                 suffix="台/週"
                                 onCommit={units => dispatch({ type: 'setProductionPlan', productId: product.id, units })}
                               />
-                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '3px' }}>
+                              <div className="plan-meta-row">
                                 <small>{formatUnits(usedWorkload)}工数</small>
+                                <span className="plan-req-cash">必要: <strong>{formatMoney(reqCash)}</strong></span>
                                 <button
                                   type="button"
                                   className="quick-btn"
@@ -112,6 +167,13 @@ export function Factory({ game }: { game: GameState }) {
                                   停止
                                 </button>
                               </div>
+                              {lastShortfall && lastShortfall.reason === 'cash' ? (
+                                <div className="product-shortfall-alert">
+                                  {lastShortfall.actualUnits === 0
+                                    ? `🚨 先週資金不足で生産停止（計画${formatUnits(lastShortfall.plannedUnits)}台→0台）`
+                                    : `⚠️ 先週資金不足で${formatUnits(lastShortfall.shortfallUnits)}台削減（実績${formatUnits(lastShortfall.actualUnits)}台）`}
+                                </div>
+                              ) : null}
                             </td>
                           </tr>
                         );
@@ -127,6 +189,9 @@ export function Factory({ game }: { game: GameState }) {
                     const per100 = category?.workloadPer100Units ?? 0;
                     const usedWorkload = category ? workloadForUnits(category, product.productionPlan) : 0;
                     const maxUnits = maxProductionUnitsFor(game, product);
+                    const costCalc = calculateEffectiveUnitCost(product, product.productionPlan, utilization);
+                    const reqCash = requiredCashForProduct(product, product.productionPlan, utilization);
+                    const lastShortfall = game.lastWeek?.productionShortfalls?.find(s => s.productId === product.id);
                     return (
                       <div className="responsive-product-card" key={`mobile-${product.id}`}>
                         <div className="card-product-header">
@@ -146,8 +211,18 @@ export function Factory({ game }: { game: GameState }) {
                             <span className="spec-value">{per100}工数/100台</span>
                           </div>
                           <div className="spec-item">
-                            <span className="spec-label">標準原価</span>
-                            <span className="spec-value">{formatUnitPrice(product.unitCost)}</span>
+                            <span className="spec-label">生産単価（実効）</span>
+                            <span className="spec-value">
+                              <strong>{formatUnitPrice(costCalc.effectiveUnitCost)}</strong>
+                              {costCalc.isSmallLotPenalty ? (
+                                <small className="cost-tag penalty">+{costCalc.deltaPercent}% 小ロット割高</small>
+                              ) : costCalc.isVolumeDiscount ? (
+                                <small className="cost-tag discount">{costCalc.deltaPercent}% 量産効果</small>
+                              ) : null}
+                              {costCalc.isOvertimePenalty ? (
+                                <small className="cost-tag overtime">⏰残業割増</small>
+                              ) : null}
+                            </span>
                           </div>
                           <div className="spec-item">
                             <span className="spec-label">現在の在庫</span>
@@ -172,9 +247,18 @@ export function Factory({ game }: { game: GameState }) {
                               suffix="台/週"
                               onCommit={units => dispatch({ type: 'setProductionPlan', productId: product.id, units })}
                             />
-                            <span className="card-workload-note">
-                              消費工数: <strong>{formatUnits(usedWorkload)}工数</strong> / 割当可能最大: {formatUnits(maxUnits)}台
-                            </span>
+                            <div className="plan-meta-row" style={{ marginTop: '4px' }}>
+                              <span className="card-workload-note">
+                                工数: <strong>{formatUnits(usedWorkload)}工数</strong> / 必要資金: <strong>{formatMoney(reqCash)}</strong>
+                              </span>
+                            </div>
+                            {lastShortfall && lastShortfall.reason === 'cash' ? (
+                              <div className="product-shortfall-alert">
+                                {lastShortfall.actualUnits === 0
+                                  ? `🚨 先週資金不足で生産停止（計画${formatUnits(lastShortfall.plannedUnits)}台→0台）`
+                                  : `⚠️ 先週資金不足で${formatUnits(lastShortfall.shortfallUnits)}台削減（実績${formatUnits(lastShortfall.actualUnits)}台）`}
+                              </div>
+                            ) : null}
                           </div>
 
                           <div className="quick-btn-group">

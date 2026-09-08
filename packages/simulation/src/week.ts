@@ -20,6 +20,7 @@ import {
   evaluateMarket,
 } from './market';
 import { nextInt } from './rng';
+import { calculateEffectiveUnitCost, factoryCapacityUtilization } from './production';
 import type {
   AdvanceResult,
   CategoryId,
@@ -28,6 +29,7 @@ import type {
   Money,
   PeriodSummary,
   Product,
+  ProductionShortfall,
   WeeklyReport,
 } from './types';
 
@@ -173,24 +175,52 @@ function runDevelopment(state: GameState): Product[] {
   return completed;
 }
 
-function runProduction(state: GameState): { produced: number; defects: number } {
+function runProduction(state: GameState): { produced: number; defects: number; shortfalls: ProductionShortfall[] } {
   const company = state.company;
   let remainingWorkload = productionCapacityWorkload(state);
   let produced = 0;
   let defects = 0;
+  const shortfalls: ProductionShortfall[] = [];
   const baseDefect = defectBasis(state);
+  const utilizationRate = factoryCapacityUtilization(state);
 
   for (const product of company.products) {
-    if (product.productionPlan <= 0 || remainingWorkload <= 0) continue;
+    product.lastWeekUnitsProduced = 0;
+    if (product.productionPlan <= 0) continue;
     const category = findCategory(product.categoryId);
     if (!category) continue;
-    let units = Math.min(product.productionPlan, unitsFromWorkload(category, remainingWorkload));
+
+    const planned = product.productionPlan;
+    const capUnits = remainingWorkload > 0 ? unitsFromWorkload(category, remainingWorkload) : 0;
+    const { effectiveUnitCost } = calculateEffectiveUnitCost(product, planned, utilizationRate);
     const cash = Math.max(0, company.accounts.cash);
-    const affordable = product.unitCost > 0 ? Math.floor((cash * 10000) / product.unitCost) : units;
-    units = Math.min(units, affordable);
+    const affordable = effectiveUnitCost > 0 ? Math.floor((cash * 10000) / effectiveUnitCost) : planned;
+
+    const units = Math.min(planned, capUnits, affordable);
+
+    if (units < planned) {
+      const reason = affordable < planned && affordable <= capUnits ? 'cash' : 'capacity';
+      const shortfallUnits = planned - units;
+      shortfalls.push({
+        productId: product.id,
+        productName: product.name,
+        plannedUnits: planned,
+        actualUnits: units,
+        shortfallUnits,
+        reason,
+      });
+      if (reason === 'cash') {
+        if (units === 0) {
+          addLog(state, 'bad', `【生産停止】手元資金不足のため、${product.name}の生産（計画${planned.toLocaleString('ja-JP')}台）が完全に停止しました。`);
+        } else {
+          addLog(state, 'warn', `【生産縮小】手元資金不足のため、${product.name}の生産が計画${planned.toLocaleString('ja-JP')}台から${units.toLocaleString('ja-JP')}台に制限されました。`);
+        }
+      }
+    }
+
     if (units <= 0) continue;
 
-    const cost = amountFromUnits(units, product.unitCost);
+    const cost = amountFromUnits(units, effectiveUnitCost);
     post(state, { debit: 'inventory', credit: 'cash', amount: cost, reason: `製造：${product.name}`, flow: 'operating' });
 
     const drawn = nextInt(state.rng, -economyRules.defectNoiseBasis, economyRules.defectNoiseBasis);
@@ -202,11 +232,12 @@ function runProduction(state: GameState): { produced: number; defects: number } 
     product.stockUnits += goodUnits;
     product.stockValue += cost;
     product.totalUnitsProduced += goodUnits;
+    product.lastWeekUnitsProduced = goodUnits;
     remainingWorkload -= workloadForUnits(category, units);
     produced += goodUnits;
     defects += defectUnits;
   }
-  return { produced, defects };
+  return { produced, defects, shortfalls };
 }
 
 type SalesResult = {
@@ -771,6 +802,7 @@ export function advanceWeek(state: GameState, options: { allowShortfall?: boolea
     cashEnd: draft.company.accounts.cash,
     defectUnits: production.defects,
     categoryShares: sales.categoryShares,
+    productionShortfalls: production.shortfalls,
   };
   draft.lastWeek = weekReport;
   updateArchiveAndMorale(draft, weekRevenue - weekExpenses);

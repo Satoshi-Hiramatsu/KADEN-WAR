@@ -4,7 +4,7 @@ import { findCategory } from '../../../packages/content/src/categories';
 import { findFeature } from '../../../packages/content/src/features';
 import { economyRules } from '../../../packages/content/src/rules';
 import { formatBrand, formatMoney, formatUnitPrice } from '../../../packages/simulation/src/money';
-import { currentDate, goalProgress, scenarioProgress } from '../../../packages/simulation/src/selectors';
+import { currentDate, getActiveAlerts, goalProgress, scenarioProgress } from '../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../packages/simulation/src/types';
 import { DevelopmentMeeting } from './screens/DevelopmentMeeting';
 import { Factory } from './screens/Factory';
@@ -134,6 +134,38 @@ function StickyHeader({
           </button>
         </div>
       </div>
+
+      {/* 重大注意・事前警告アラート（赤文字バナー） */}
+      {(() => {
+        const activeAlerts = getActiveAlerts(game);
+        if (activeAlerts.length === 0) return null;
+        return (
+          <div className="system-alerts-container" role="alert" aria-live="assertive">
+            {activeAlerts.map(alert => (
+              <div key={alert.id} className={`system-alert-banner alert-${alert.level}`}>
+                <div className="alert-content">
+                  <span className="alert-icon" aria-hidden="true">
+                    {alert.level === 'critical' ? '🚨' : '⚠️'}
+                  </span>
+                  <div className="alert-text">
+                    <strong className="alert-title">{alert.title}</strong>
+                    <span className="alert-message">{alert.message}</span>
+                  </div>
+                </div>
+                {alert.actionScreen ? (
+                  <button
+                    type="button"
+                    className="alert-action-btn"
+                    onClick={() => handleScreenChange(alert.actionScreen!)}
+                  >
+                    {alert.actionLabel ?? '詳細へ'} ➔
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {game.company.projects.length > 0 ? (
         <div className="dev-progress-banner" role="status">

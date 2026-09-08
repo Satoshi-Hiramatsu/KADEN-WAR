@@ -119,6 +119,7 @@ export type Product = {
   totalRevenue: Money;
   lastWeekUnitsSold: number;
   lastWeekShareBasis: number;
+  lastWeekUnitsProduced?: number;
   advancement: number;
   novelty: number;
   practicality: number;
@@ -227,6 +228,15 @@ export type EventLogEntry = {
   message: string;
 };
 
+export type ProductionShortfall = {
+  productId: string;
+  productName: string;
+  plannedUnits: number;
+  actualUnits: number;
+  shortfallUnits: number;
+  reason: 'cash' | 'capacity';
+};
+
 export type WeeklyReport = {
   week: number;
   unitsProduced: number;
@@ -238,6 +248,18 @@ export type WeeklyReport = {
   cashEnd: Money;
   defectUnits: number;
   categoryShares: { categoryId: CategoryId; demandUnits: number; ownUnits: number; shareBasis: number }[];
+  productionShortfalls?: ProductionShortfall[];
+};
+
+export type SystemAlertLevel = 'critical' | 'warning' | 'info';
+
+export type SystemAlert = {
+  id: string;
+  level: SystemAlertLevel;
+  title: string;
+  message: string;
+  actionScreen?: 'finance' | 'factory' | 'sales' | 'lab';
+  actionLabel?: string;
 };
 
 export type ScenarioProgress = {
