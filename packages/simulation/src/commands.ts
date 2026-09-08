@@ -1,4 +1,4 @@
-import { findCategory, workloadForUnits } from '../../content/src/categories';
+import { findCategory, unitsFromWorkload, workloadForUnits } from '../../content/src/categories';
 import { findAdCampaign } from '../../content/src/advertising';
 import { channels, findChannel, type ChannelId } from '../../content/src/channels';
 import { findExecutive } from '../../content/src/executives';
@@ -231,6 +231,22 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
         if (totalChannels <= 0) return fail(state, '販路がありません。販売本部で販路を開いてください。');
         if (!product.onSale) product.releasedWeek = draft.week;
         product.onSale = true;
+        // 発売時に生産計画が0かつ在庫0の場合、工場の余力工数から初期生産計画を割り当てる
+        if (product.productionPlan === 0 && product.stockUnits === 0) {
+          const category = findCategory(product.categoryId);
+          if (category) {
+            const capacity = productionCapacityWorkload(draft);
+            let used = 0;
+            for (const candidate of company.products) {
+              const candCat = findCategory(candidate.categoryId);
+              if (candCat) used += workloadForUnits(candCat, candidate.productionPlan);
+            }
+            const remaining = Math.max(0, capacity - used);
+            if (remaining > 0) {
+              product.productionPlan = unitsFromWorkload(category, remaining);
+            }
+          }
+        }
       } else {
         product.onSale = false;
       }

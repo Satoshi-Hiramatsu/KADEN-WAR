@@ -332,3 +332,265 @@ header { padding-bottom: 2px; }
   .screen-col { gap: 10px; }
   .npc-callout { padding: 8px 10px; }
 }
+
+/* ==========================================================
+   レスポンシブ対応：テーブルとモバイルカードの切り替え
+   （スマートフォンで横スクロールを出さず、文字の縦伸びを防ぐ）
+   ========================================================== */
+
+/* テーブル内の製品セルが文字単位で縦伸びするのを防ぐセーフティネット */
+.product-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+.product-cell-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.product-cell-info span {
+  white-space: nowrap;
+  word-break: keep-all;
+  font-weight: 700;
+}
+
+/* デスクトップとモバイルの表示切り替え */
+.desktop-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+.mobile-cards-wrap {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop-table-wrap {
+    display: none;
+  }
+  .mobile-cards-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* --- モバイル専用製品カード --- */
+.responsive-product-card {
+  background: #ffffff;
+  border: 1px solid #b7beaf;
+  border-top: 4px solid #3c5448;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+.card-product-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.card-product-title-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.card-product-name {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #1e332c;
+  line-height: 1.3;
+  word-break: break-word;
+}
+.card-product-category {
+  font-size: 0.76rem;
+  color: #5e6456;
+}
+
+/* 状態ピルバッジ */
+.status-pill {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 2px;
+  border: 1px solid #9ea899;
+}
+.status-pill.active {
+  background: #eef7ee;
+  color: #245b36;
+  border-color: #7bb58d;
+}
+.status-pill.idle {
+  background: #f2eee3;
+  color: #6d6b60;
+  border-color: #c9c4b3;
+}
+
+/* スペックグリッド */
+.card-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  background: #f7f4ea;
+  border: 1px solid #ded9cb;
+  padding: 8px 10px;
+}
+.card-spec-grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.spec-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.spec-label {
+  font-size: 0.68rem;
+  color: #6b7264;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+.spec-value {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1f2d27;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spec-value.highlight {
+  color: #a34d27;
+}
+
+/* 生産・価格入力部 */
+.card-plan-section,
+.card-pricing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fbf9f4;
+  border: 1px solid #e5e0d2;
+  padding: 10px;
+}
+.card-plan-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-workload-note {
+  font-size: 0.76rem;
+  color: #5e6456;
+  font-variant-numeric: tabular-nums;
+}
+
+/* クイック操作ボタン */
+.quick-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.quick-btn-label {
+  font-size: 0.72rem;
+  color: #6b7264;
+  flex: none;
+}
+button.quick-btn {
+  font-size: 0.74rem;
+  padding: 3px 8px;
+  min-height: 28px;
+  line-height: 1.2;
+}
+
+/* 在庫ゼロ警告ボックス */
+.stock-warning-box {
+  background: #fdf5ea;
+  border: 1px solid #e8ca96;
+  border-left: 4px solid #c97d1e;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stock-warning-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stock-warning-text strong {
+  font-size: 0.82rem;
+  color: #8c5214;
+}
+.stock-warning-text span {
+  font-size: 0.76rem;
+  color: #68421b;
+  line-height: 1.4;
+}
+button.quick-produce-btn {
+  background: #3c5448;
+  color: #fdfcf7;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  min-height: 30px;
+  border: 1px solid #283a31;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+button.quick-produce-btn:hover {
+  background: #4e6b5c;
+}
+.stock-warning-note {
+  font-size: 0.72rem;
+  color: #8c5214;
+}
+
+/* カードアクションバー（ボタン群） */
+.card-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.card-action-bar button {
+  flex: 1;
+  min-height: 34px;
+  font-size: 0.84rem;
+  justify-content: center;
+}
+.card-action-bar button.link {
+  flex: none;
+  font-size: 0.76rem;
+  padding: 4px 8px;
+}
+
+/* テーブル内の余力生産ボタン（デスクトップ用） */
+.table-quick-btn {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  min-height: 24px;
+  background: #3c5448;
+  color: #fdfcf7;
+  border: 1px solid #283a31;
+}
+.table-stock-warn {
+  display: block;
+  font-size: 0.72rem;
+  color: #a34d27;
+  font-weight: 700;
+  margin-top: 2px;
+}
+

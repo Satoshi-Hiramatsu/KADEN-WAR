@@ -53,47 +53,160 @@ export function Factory({ game }: { game: GameState }) {
             {products.length === 0 ? (
               <p>生産できる製品がありません。研究所で製品を開発してください。</p>
             ) : (
-              <table>
-                <thead>
-                  <tr><th>製品</th><th>1台の工数</th><th>標準原価</th><th>在庫</th><th>在庫平均原価</th><th>週の生産量</th></tr>
-                </thead>
-                <tbody>
+              <>
+                {/* PC/タブレット用テーブル表示 */}
+                <div className="desktop-table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>製品</th><th>1台の工数</th><th>標準原価</th><th>在庫</th><th>在庫平均原価</th><th>週の生産量</th></tr>
+                    </thead>
+                    <tbody>
+                      {products.map(product => {
+                        const category = findCategory(product.categoryId);
+                        const per100 = category?.workloadPer100Units ?? 0;
+                        const usedWorkload = category ? workloadForUnits(category, product.productionPlan) : 0;
+                        const maxUnits = maxProductionUnitsFor(game, product);
+                        return (
+                          <tr key={product.id}>
+                            <th scope="row">
+                              <div className="product-cell">
+                                <ProductSprite categoryId={product.categoryId} year={currentYear} size="sm" />
+                                <div className="product-cell-info">
+                                  <span>{product.name}</span>
+                                  <small>{category?.name ?? product.categoryId}</small>
+                                </div>
+                              </div>
+                            </th>
+                            <td>{per100}工数/100台</td>
+                            <td>{formatUnitPrice(product.unitCost)}</td>
+                            <td>{formatUnits(product.stockUnits)}台</td>
+                            <td>{averageUnitCost(product.stockUnits, product.stockValue)}</td>
+                            <td>
+                              <NumberField
+                                label={`${product.name}の生産量`}
+                                value={product.productionPlan}
+                                min={0}
+                                max={maxUnits}
+                                step={Math.max(1, Math.floor(10000 / Math.max(1, per100)))}
+                                suffix="台/週"
+                                onCommit={units => dispatch({ type: 'setProductionPlan', productId: product.id, units })}
+                              />
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '3px' }}>
+                                <small>{formatUnits(usedWorkload)}工数</small>
+                                <button
+                                  type="button"
+                                  className="quick-btn"
+                                  style={{ minHeight: '22px', padding: '1px 5px', fontSize: '0.68rem' }}
+                                  onClick={() => dispatch({ type: 'setProductionPlan', productId: product.id, units: maxUnits })}
+                                  title="余力全量を割り当てる"
+                                >
+                                  最大
+                                </button>
+                                <button
+                                  type="button"
+                                  className="quick-btn secondary"
+                                  style={{ minHeight: '22px', padding: '1px 5px', fontSize: '0.68rem' }}
+                                  onClick={() => dispatch({ type: 'setProductionPlan', productId: product.id, units: 0 })}
+                                  title="生産を停止する"
+                                >
+                                  停止
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* スマートフォン用カード表示 */}
+                <div className="mobile-cards-wrap">
                   {products.map(product => {
                     const category = findCategory(product.categoryId);
                     const per100 = category?.workloadPer100Units ?? 0;
                     const usedWorkload = category ? workloadForUnits(category, product.productionPlan) : 0;
+                    const maxUnits = maxProductionUnitsFor(game, product);
                     return (
-                      <tr key={product.id}>
-                        <th scope="row">
-                          <div className="product-cell">
-                            <ProductSprite categoryId={product.categoryId} year={currentYear} size="sm" />
-                            <div className="product-cell-info">
-                              <span>{product.name}</span>
-                              <small>{category?.name ?? product.categoryId}</small>
-                            </div>
+                      <div className="responsive-product-card" key={`mobile-${product.id}`}>
+                        <div className="card-product-header">
+                          <ProductSprite categoryId={product.categoryId} year={currentYear} size="sm" />
+                          <div className="card-product-title-block">
+                            <span className="card-product-name">{product.name}</span>
+                            <small className="card-product-category">{category?.name ?? product.categoryId}</small>
                           </div>
-                        </th>
-                        <td>{per100}工数/100台</td>
-                        <td>{formatUnitPrice(product.unitCost)}</td>
-                        <td>{formatUnits(product.stockUnits)}台</td>
-                        <td>{averageUnitCost(product.stockUnits, product.stockValue)}</td>
-                        <td>
-                          <NumberField
-                            label={`${product.name}の生産量`}
-                            value={product.productionPlan}
-                            min={0}
-                            max={maxProductionUnitsFor(game, product)}
-                            step={Math.max(1, Math.floor(10000 / Math.max(1, per100)))}
-                            suffix="台/週"
-                            onCommit={units => dispatch({ type: 'setProductionPlan', productId: product.id, units })}
-                          />
-                          <small>{formatUnits(usedWorkload)}工数</small>
-                        </td>
-                      </tr>
+                          <span className={`status-pill ${product.productionPlan > 0 ? 'active' : 'idle'}`}>
+                            {product.productionPlan > 0 ? `${formatUnits(product.productionPlan)}台/週` : '生産停止中'}
+                          </span>
+                        </div>
+
+                        <div className="card-spec-grid">
+                          <div className="spec-item">
+                            <span className="spec-label">1台の工数</span>
+                            <span className="spec-value">{per100}工数/100台</span>
+                          </div>
+                          <div className="spec-item">
+                            <span className="spec-label">標準原価</span>
+                            <span className="spec-value">{formatUnitPrice(product.unitCost)}</span>
+                          </div>
+                          <div className="spec-item">
+                            <span className="spec-label">現在の在庫</span>
+                            <span className={`spec-value ${product.stockUnits === 0 ? 'highlight' : ''}`}>
+                              {formatUnits(product.stockUnits)}台
+                            </span>
+                          </div>
+                          <div className="spec-item">
+                            <span className="spec-label">在庫平均原価</span>
+                            <span className="spec-value">{averageUnitCost(product.stockUnits, product.stockValue)}</span>
+                          </div>
+                        </div>
+
+                        <div className="card-plan-section">
+                          <div className="card-plan-input-row">
+                            <NumberField
+                              label={`${product.name}の週生産量`}
+                              value={product.productionPlan}
+                              min={0}
+                              max={maxUnits}
+                              step={Math.max(1, Math.floor(10000 / Math.max(1, per100)))}
+                              suffix="台/週"
+                              onCommit={units => dispatch({ type: 'setProductionPlan', productId: product.id, units })}
+                            />
+                            <span className="card-workload-note">
+                              消費工数: <strong>{formatUnits(usedWorkload)}工数</strong> / 割当可能最大: {formatUnits(maxUnits)}台
+                            </span>
+                          </div>
+
+                          <div className="quick-btn-group">
+                            <span className="quick-btn-label">クイック設定:</span>
+                            <button
+                              type="button"
+                              className="quick-btn"
+                              onClick={() => dispatch({ type: 'setProductionPlan', productId: product.id, units: maxUnits })}
+                            >
+                              最大余力（{formatUnits(maxUnits)}台）
+                            </button>
+                            <button
+                              type="button"
+                              className="quick-btn secondary"
+                              onClick={() => dispatch({ type: 'setProductionPlan', productId: product.id, units: Math.floor(maxUnits / 2) })}
+                            >
+                              半量
+                            </button>
+                            <button
+                              type="button"
+                              className="quick-btn secondary"
+                              onClick={() => dispatch({ type: 'setProductionPlan', productId: product.id, units: 0 })}
+                            >
+                              停止（0台）
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+              </>
             )}
             <small>
               生産能力は「工数」で数えます。乾電池は100本あたり3工数、白黒テレビは100台あたり4,000工数というように、

@@ -5,7 +5,7 @@ import { categories, findCategory, demandUnitsAt, unitsFromWorkload } from '../.
 import { weeksPerYear } from '../../../../packages/content/src/rules';
 import { formatBasisAsPercent, formatMoney, formatUnitPrice, formatUnits } from '../../../../packages/simulation/src/money';
 import { channelCapacityWorkload, forecastProductAtPrice } from '../../../../packages/simulation/src/market';
-import { departmentReports, marketForecast } from '../../../../packages/simulation/src/selectors';
+import { departmentReports, marketForecast, maxProductionUnitsFor } from '../../../../packages/simulation/src/selectors';
 import type { GameState, Product } from '../../../../packages/simulation/src/types';
 import {
   ExecutiveHeader,
@@ -55,34 +55,195 @@ export function SalesOffice({ game }: { game: GameState }) {
         />
       </SceneBanner>
 
-      {/* 価格表は列数が多いため、常に画面幅いっぱいで表示する */}
+      {/* 価格表は列数が多いため、デスクトップは幅広テーブル、スマホはカード形式で表示する */}
       <Panel eyebrow="01 / 価格と発売" title="製品の売り方">
         {products.length === 0 ? (
           <p>製品がありません。研究所で開発してください。</p>
         ) : (
-          <table>
-            <thead>
-              <tr><th>製品</th><th>性能</th><th>先進/目新/実用</th><th>原価</th><th>価格</th><th>先週</th><th>販売状態</th><th>操作</th></tr>
-            </thead>
-            <tbody>
+          <>
+            {/* PC/タブレット用テーブル表示 */}
+            <div className="desktop-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>製品</th>
+                    <th>性能</th>
+                    <th>先進/目新/実用</th>
+                    <th>原価</th>
+                    <th>価格</th>
+                    <th>在庫 / 週生産</th>
+                    <th>先週</th>
+                    <th>販売状態</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map(product => {
+                    const category = findCategory(product.categoryId);
+                    const priceForecast = forecastProductAtPrice(game, product.id, product.price);
+                    const maxUnits = maxProductionUnitsFor(game, product);
+                    const isZeroProduction = product.productionPlan === 0 && product.stockUnits === 0;
+                    return (
+                      <tr key={product.id}>
+                        <th scope="row">
+                          <div className="product-cell">
+                            <ProductSprite categoryId={product.categoryId} year={currentYear} size="sm" />
+                            <div className="product-cell-info">
+                              <span>{product.name}</span>
+                              <small>{category?.name ?? product.categoryId}</small>
+                            </div>
+                          </div>
+                        </th>
+                        <td>{product.performance}</td>
+                        <td>{product.advancement} / {product.novelty} / {product.practicality}</td>
+                        <td>{formatUnitPrice(product.unitCost)}</td>
+                        <td>
+                          <NumberField
+                            label={`${product.name}の価格`}
+                            value={product.price}
+                            min={1}
+                            max={2000000}
+                            step={Math.max(1, Math.round((category?.referencePrice ?? 1000) / 100))}
+                            suffix="円"
+                            onCommit={price => dispatch({ type: 'setPrice', productId: product.id, price })}
+                          />
+                          <small>
+                            標準 {formatUnitPrice(category?.referencePrice ?? 0)}
+                            ／販売能力 {category ? formatUnits(unitsFromWorkload(category, salesWorkload)) : 0}台/週
+                          </small>
+                          {priceForecast ? (
+                            <small className="price-forecast">
+                              この価格なら想定 <strong>{formatUnits(priceForecast.sellableUnits)}台/週</strong>
+                              （占有率{formatBasisAsPercent(priceForecast.shareBasis)}）
+                              ・売上{formatMoney(priceForecast.revenue)}
+                              ・粗利{formatMoney(priceForecast.grossProfit)}
+                            </small>
+                          ) : null}
+                        </td>
+                        <td>
+                          <div>在庫: <strong>{formatUnits(product.stockUnits)}台</strong></div>
+                          <div>生産: {formatUnits(product.productionPlan)}台/週</div>
+                          {isZeroProduction ? (
+                            <>
+                              <span className="table-stock-warn">⚠️ 生産0台（在庫なし）</span>
+                              {maxUnits > 0 ? (
+                                <button
+                                  type="button"
+                                  className="table-quick-btn"
+                                  onClick={() => dispatch({ type: 'setProductionPlan', productId: product.id, units: maxUnits })}
+                                  title="工場の余力工数で生産を開始する"
+                                >
+                                  余力で生産（{formatUnits(maxUnits)}台）
+                                </button>
+                              ) : null}
+                            </>
+                          ) : null}
+                        </td>
+                        <td>
+                          {formatUnits(product.lastWeekUnitsSold)}台
+                          <small>占有率 {formatBasisAsPercent(product.lastWeekShareBasis)}</small>
+                        </td>
+                        <td>
+                          <button
+                            className={product.onSale ? 'secondary' : undefined}
+                            onClick={() => dispatch({ type: 'setOnSale', productId: product.id, onSale: !product.onSale })}
+                          >
+                            {product.onSale ? '販売を止める' : '発売する'}
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            className="link"
+                            title="製品を引退させて歴代名機図鑑に送る"
+                            onClick={() => dispatch({ type: 'retireProduct', productId: product.id })}
+                          >
+                            引退（殿堂入り）
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* スマートフォン用カード表示 */}
+            <div className="mobile-cards-wrap">
               {products.map(product => {
                 const category = findCategory(product.categoryId);
                 const priceForecast = forecastProductAtPrice(game, product.id, product.price);
+                const maxUnits = maxProductionUnitsFor(game, product);
+                const isZeroProduction = product.productionPlan === 0 && product.stockUnits === 0;
                 return (
-                  <tr key={product.id}>
-                    <th scope="row">
-                      <div className="product-cell">
-                        <ProductSprite categoryId={product.categoryId} year={currentYear} size="sm" />
-                        <div className="product-cell-info">
-                          <span>{product.name}</span>
-                          <small>{category?.name ?? product.categoryId}</small>
-                        </div>
+                  <div className="responsive-product-card" key={`mobile-${product.id}`}>
+                    <div className="card-product-header">
+                      <ProductSprite categoryId={product.categoryId} year={currentYear} size="sm" />
+                      <div className="card-product-title-block">
+                        <span className="card-product-name">{product.name}</span>
+                        <small className="card-product-category">{category?.name ?? product.categoryId}</small>
                       </div>
-                    </th>
-                    <td>{product.performance}</td>
-                    <td>{product.advancement} / {product.novelty} / {product.practicality}</td>
-                    <td>{formatUnitPrice(product.unitCost)}</td>
-                    <td>
+                      <span className={`status-pill ${product.onSale ? 'active' : 'idle'}`}>
+                        {product.onSale ? '販売中' : '販売停止中'}
+                      </span>
+                    </div>
+
+                    <div className="card-spec-grid cols-3">
+                      <div className="spec-item">
+                        <span className="spec-label">性能</span>
+                        <span className="spec-value">{product.performance}</span>
+                      </div>
+                      <div className="spec-item">
+                        <span className="spec-label">先進/目新/実用</span>
+                        <span className="spec-value" style={{ fontSize: '0.78rem' }}>
+                          {product.advancement}/{product.novelty}/{product.practicality}
+                        </span>
+                      </div>
+                      <div className="spec-item">
+                        <span className="spec-label">標準原価</span>
+                        <span className="spec-value">{formatUnitPrice(product.unitCost)}</span>
+                      </div>
+                      <div className="spec-item">
+                        <span className="spec-label">現在の在庫</span>
+                        <span className={`spec-value ${product.stockUnits === 0 ? 'highlight' : ''}`}>
+                          {formatUnits(product.stockUnits)}台
+                        </span>
+                      </div>
+                      <div className="spec-item">
+                        <span className="spec-label">週の生産量</span>
+                        <span className="spec-value">{formatUnits(product.productionPlan)}台/週</span>
+                      </div>
+                      <div className="spec-item">
+                        <span className="spec-label">先週販売（占有率）</span>
+                        <span className="spec-value">
+                          {formatUnits(product.lastWeekUnitsSold)}台
+                          <small style={{ display: 'block', fontSize: '0.68rem', fontWeight: 400 }}>
+                            {formatBasisAsPercent(product.lastWeekShareBasis)}
+                          </small>
+                        </span>
+                      </div>
+                    </div>
+
+                    {isZeroProduction ? (
+                      <div className="stock-warning-box">
+                        <div className="stock-warning-text">
+                          <strong>⚠️ 週の生産量が0台（在庫なし）です</strong>
+                          <span>このままでは販売開始しても店頭に製品がなく売れません。</span>
+                        </div>
+                        {maxUnits > 0 ? (
+                          <button
+                            type="button"
+                            className="quick-produce-btn"
+                            onClick={() => dispatch({ type: 'setProductionPlan', productId: product.id, units: maxUnits })}
+                          >
+                            工場の余力で生産する（{formatUnits(maxUnits)}台/週）
+                          </button>
+                        ) : (
+                          <small className="stock-warning-note">工場の生産余力がありません。工場で他製品の生産量を調整してください。</small>
+                        )}
+                      </div>
+                    ) : null}
+
+                    <div className="card-pricing-section">
                       <NumberField
                         label={`${product.name}の価格`}
                         value={product.price}
@@ -93,31 +254,25 @@ export function SalesOffice({ game }: { game: GameState }) {
                         onCommit={price => dispatch({ type: 'setPrice', productId: product.id, price })}
                       />
                       <small>
-                        標準 {formatUnitPrice(category?.referencePrice ?? 0)}
-                        ／販売能力 {category ? formatUnits(unitsFromWorkload(category, salesWorkload)) : 0}台/週
+                        標準価格: {formatUnitPrice(category?.referencePrice ?? 0)}
+                        ／販売能力: {category ? formatUnits(unitsFromWorkload(category, salesWorkload)) : 0}台/週
                       </small>
                       {priceForecast ? (
-                        <small className="price-forecast">
-                          この価格なら想定 <strong>{formatUnits(priceForecast.sellableUnits)}台/週</strong>
-                          （占有率{formatBasisAsPercent(priceForecast.shareBasis)}）
-                          ・売上{formatMoney(priceForecast.revenue)}
-                          ・粗利{formatMoney(priceForecast.grossProfit)}
-                        </small>
+                        <div className="price-forecast" style={{ marginTop: '2px' }}>
+                          この価格なら想定: <strong>{formatUnits(priceForecast.sellableUnits)}台/週</strong>
+                          （占有率{formatBasisAsPercent(priceForecast.shareBasis)}）<br />
+                          売上{formatMoney(priceForecast.revenue)}・粗利{formatMoney(priceForecast.grossProfit)}
+                        </div>
                       ) : null}
-                    </td>
-                    <td>
-                      {formatUnits(product.lastWeekUnitsSold)}台
-                      <small>占有率 {formatBasisAsPercent(product.lastWeekShareBasis)}</small>
-                    </td>
-                    <td>
+                    </div>
+
+                    <div className="card-action-bar">
                       <button
                         className={product.onSale ? 'secondary' : undefined}
                         onClick={() => dispatch({ type: 'setOnSale', productId: product.id, onSale: !product.onSale })}
                       >
                         {product.onSale ? '販売を止める' : '発売する'}
                       </button>
-                    </td>
-                    <td>
                       <button
                         className="link"
                         title="製品を引退させて歴代名機図鑑に送る"
@@ -125,12 +280,12 @@ export function SalesOffice({ game }: { game: GameState }) {
                       >
                         引退（殿堂入り）
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
         <small>
           価格の編集はこの画面に一本化しています。市場の標準価格より安いほど売れやすく、利益は薄くなります。

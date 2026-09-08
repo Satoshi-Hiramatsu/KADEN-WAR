@@ -7,7 +7,7 @@
 1953年のテレビ本放送、1955年の電気釜、1950年代後半の「三種の神器」ブームまで、製品が世に出る順番は実際の年代に合わせています。
 
 [![Cloudflare Workers](https://img.shields.io/badge/Deploy-Cloudflare%20Workers-orange.svg)](https://kaden-war.molkz.com/)
-[![Version](https://img.shields.io/badge/Version-V0.1.3-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-V0.1.5-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](tsconfig.json)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)](#素材名称の扱い)
 
@@ -18,7 +18,7 @@
 ## ゲーム画面ギャラリー
 
 本ゲームは、90年代の本格国産経営シミュレーションゲーム（PC-98 / スーパーファミコン黄金期）の重厚なプレイ感と操作性を現代のWebフロントエンド技術で再現しています。
-各拠点は広い画面では左右2カラムで一覧でき、区画ごとの折りたたみと固定表示のトップメニューにより、スクロールを最小限に抑えた操作性を確保しています。
+PCなどの大画面では左右2カラムの一覧性に優れたダッシュボードとして機能し、スマートフォンでは横スクロールを排除した専用のカードレイアウトへ自動適応。指先ひとつで生産計画や価格戦略の立案・実行が可能です。各区画の折りたたみと固定表示メニューにより、快適な操作性を確保しています。
 
 ### 1. メイン画面 — 社長室 & 役員会議室
 | 社長室（全社KPI・時代イベント速報・競合動向） | 定例役員会議（月初の経営具申・提案採択） |
@@ -218,7 +218,7 @@
 - **フロントエンド**: React 19.2, TypeScript 6.0, Zustand 5.0, Vite 8.2
 - **シミュレーション**: 純粋関数型設計の決定論的エンジン（`packages/simulation`）。UIとゲーム状態更新を完全に分離。
 - **インフラ**: Cloudflare Workers Static Assets（高速エッジ配信）, Cloudflare D1（Serverless SQL）
-- **テスト・品質管理**: Vitest 5.0（44テスト全通過）, ESLint 10.1, TypeScript strict型検査, Playwright E2Eスモーク検証
+- **テスト・品質管理**: Vitest 5.0（51テスト全通過）, ESLint 10.1, TypeScript strict型検査, Playwright E2Eスモーク検証
 
 ---
 
