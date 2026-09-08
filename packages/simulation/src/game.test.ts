@@ -143,6 +143,70 @@ describe('生産と販売', () => {
     const result = applyCommand(state, { type: 'setProductionPlan', productId: product.id, units: capacity + 1 });
     expect(result.ok).toBe(false);
   });
+
+  it('複数製品を発売しているとき、1つ目の製品に十分な在庫があっても2つ目の製品がゼロにならず販売される', () => {
+    let state = newGame();
+    // 乾電池と白熱電球を開発して発売する
+    state = run(state, [
+      {
+        type: 'startDevelopment',
+        name: '乾電池1号',
+        categoryId: 'battery-dry',
+        moduleIds: defaultModuleIds('battery-dry'),
+        qualityLevel: 0,
+      },
+    ]);
+    state = advance(state, 3);
+    const battery = state.company.products[0];
+    if (!battery) throw new Error('乾電池が完成していません。');
+
+    state = run(state, [
+      {
+        type: 'startDevelopment',
+        name: '白熱電球1号',
+        categoryId: 'bulb-incandescent',
+        moduleIds: defaultModuleIds('bulb-incandescent'),
+        qualityLevel: 0,
+      },
+    ]);
+    state = advance(state, 3);
+    const bulb = state.company.products[1];
+    if (!bulb) throw new Error('白熱電球が完成していません。');
+
+    // どちらも発売し、十分な在庫を注入
+    state = run(state, [
+      { type: 'setPrice', productId: battery.id, price: 34 },
+      { type: 'setOnSale', productId: battery.id, onSale: true },
+      { type: 'setPrice', productId: bulb.id, price: 60 },
+      { type: 'setOnSale', productId: bulb.id, onSale: true },
+    ]);
+
+    const targetBattery = state.company.products.find(p => p.id === battery.id)!;
+    const targetBulb = state.company.products.find(p => p.id === bulb.id)!;
+    targetBattery.stockUnits = 20000;
+    targetBattery.stockValue = 20000 * 19;
+    targetBulb.stockUnits = 5000;
+    targetBulb.stockValue = 5000 * 38;
+
+    const result = advanceWeek(state);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('週送りに失敗しました。');
+
+    const updatedBattery = result.state.company.products.find(p => p.id === battery.id);
+    const updatedBulb = result.state.company.products.find(p => p.id === bulb.id);
+    expect(updatedBattery?.lastWeekUnitsSold).toBeGreaterThan(0);
+    expect(updatedBulb?.lastWeekUnitsSold).toBeGreaterThan(0);
+
+    // 乾電池と白熱電球の消費工数の合計が販路能力（800工数）以下であることを検証
+    const batteryCat = findCategory('battery-dry')!;
+    const bulbCat = findCategory('bulb-incandescent')!;
+    const batteryWorkload = Math.ceil(((updatedBattery?.lastWeekUnitsSold ?? 0) * batteryCat.workloadPer100Units) / 100);
+    const bulbWorkload = Math.ceil(((updatedBulb?.lastWeekUnitsSold ?? 0) * bulbCat.workloadPer100Units) / 100);
+    expect(batteryWorkload + bulbWorkload).toBeLessThanOrEqual(800);
+    // 両製品とも均等枠（約400工数分）近く売れていること（乾電池は10,000台以上、電球は5,000台以上または在庫上限）
+    expect(updatedBattery?.lastWeekUnitsSold).toBeGreaterThan(10000);
+    expect(updatedBulb?.lastWeekUnitsSold).toBeGreaterThan(3000);
+  });
 });
 
 describe('設計と研究', () => {

@@ -221,7 +221,6 @@ function runSales(state: GameState): SalesResult {
   const evaluation = evaluateMarket(state, { withNoise: true });
   state.rng = evaluation.rng;
 
-  let remainingChannelWorkload = channelCapacityWorkload(state);
   const commissionBasis = channelCommissionBasis(state);
   let unitsSold = 0;
   let revenue = 0;
@@ -233,48 +232,141 @@ function runSales(state: GameState): SalesResult {
     product.lastWeekShareBasis = 0;
   }
 
+  type PlayerSaleItem = {
+    entry: (typeof evaluation.markets)[number]['entries'][number];
+    product: Product;
+    category: NonNullable<ReturnType<typeof findCategory>>;
+    desiredUnits: number;
+    desiredWorkload: number;
+    allocatedUnits: number;
+  };
+
+  const saleItems: PlayerSaleItem[] = [];
+
   for (const market of evaluation.markets) {
-    let ownUnits = 0;
     for (const entry of market.entries) {
       if (entry.owner !== 'player') continue;
       const product = company.products.find(candidate => candidate.id === entry.id);
       if (!product) continue;
+      product.lastWeekShareBasis = entry.shareBasis;
       const category = findCategory(product.categoryId);
       if (!category) continue;
-      const sellable = unitsFromWorkload(category, remainingChannelWorkload);
-      const units = Math.min(entry.unitsDemanded, product.stockUnits, sellable);
-      product.lastWeekShareBasis = entry.shareBasis;
-      if (units <= 0) continue;
-
-      const productRevenue = amountFromUnits(units, product.price);
-      const productCogs = product.stockUnits > 0
-        ? Math.floor((product.stockValue * units) / product.stockUnits)
-        : 0;
-
-      post(state, { debit: 'cash', credit: 'revenue', amount: productRevenue, reason: `売上：${product.name}`, flow: 'operating' });
-      post(state, { debit: 'cogs', credit: 'inventory', amount: productCogs, reason: `売上原価：${product.name}` });
-
-      product.stockUnits -= units;
-      product.stockValue = Math.max(0, product.stockValue - productCogs);
-      if (product.stockUnits === 0) product.stockValue = 0;
-      product.totalUnitsSold += units;
-      product.totalRevenue += productRevenue;
-      product.lastWeekUnitsSold = units;
-
-      remainingChannelWorkload -= workloadForUnits(category, units);
-      unitsSold += units;
-      ownUnits += units;
-      revenue += productRevenue;
-      cogs += productCogs;
-    }
-    if (market.demandUnits > 0) {
-      categoryShares.push({
-        categoryId: market.categoryId,
-        demandUnits: market.demandUnits,
-        ownUnits,
-        shareBasis: Math.floor((ownUnits * 10000) / market.demandUnits),
+      const desiredUnits = Math.max(0, Math.min(entry.unitsDemanded, product.stockUnits));
+      const desiredWorkload = workloadForUnits(category, desiredUnits);
+      saleItems.push({
+        entry,
+        product,
+        category,
+        desiredUnits,
+        desiredWorkload,
+        allocatedUnits: 0,
       });
     }
+  }
+
+  const totalChannelCapacity = channelCapacityWorkload(state);
+  if (totalChannelCapacity > 0) {
+    let availableWorkload = totalChannelCapacity;
+    const targets = saleItems.filter(item => item.desiredUnits > 0 && item.desiredWorkload > 0);
+    const needed = new Map<PlayerSaleItem, number>();
+    const allocated = new Map<PlayerSaleItem, number>();
+
+    for (const item of targets) {
+      needed.set(item, item.desiredWorkload);
+      allocated.set(item, 0);
+    }
+
+    let active = [...targets];
+
+    while (active.length > 0 && availableWorkload > 0) {
+      const fairShare = Math.floor(availableWorkload / active.length);
+      if (fairShare === 0) break;
+
+      const satisfied = active.filter(item => (needed.get(item) ?? 0) <= fairShare);
+      if (satisfied.length > 0) {
+        for (const item of satisfied) {
+          const req = needed.get(item)!;
+          allocated.set(item, (allocated.get(item) ?? 0) + req);
+          availableWorkload -= req;
+          needed.set(item, 0);
+        }
+        active = active.filter(item => (needed.get(item) ?? 0) > 0);
+      } else {
+        for (const item of active) {
+          allocated.set(item, (allocated.get(item) ?? 0) + fairShare);
+          availableWorkload -= fairShare;
+          needed.set(item, (needed.get(item) ?? 0) - fairShare);
+        }
+        break;
+      }
+    }
+
+    let usedWorkload = 0;
+    for (const item of targets) {
+      const w = allocated.get(item) ?? 0;
+      const unitsFromW = unitsFromWorkload(item.category, w);
+      item.allocatedUnits = Math.min(item.desiredUnits, unitsFromW);
+      usedWorkload += workloadForUnits(item.category, item.allocatedUnits);
+    }
+
+    let remainingWorkload = Math.max(0, totalChannelCapacity - usedWorkload);
+    if (remainingWorkload > 0) {
+      for (const item of targets) {
+        if (remainingWorkload <= 0) break;
+        if (item.allocatedUnits >= item.desiredUnits) continue;
+        const addCap = unitsFromWorkload(item.category, remainingWorkload);
+        const canAdd = Math.min(item.desiredUnits - item.allocatedUnits, addCap);
+        if (canAdd > 0) {
+          const addedWorkload = workloadForUnits(item.category, item.allocatedUnits + canAdd)
+            - workloadForUnits(item.category, item.allocatedUnits);
+          if (addedWorkload <= remainingWorkload) {
+            item.allocatedUnits += canAdd;
+            remainingWorkload -= addedWorkload;
+          }
+        }
+      }
+    }
+  }
+
+  for (const item of saleItems) {
+    const units = item.allocatedUnits;
+    if (units <= 0) continue;
+
+    const product = item.product;
+    const productRevenue = amountFromUnits(units, product.price);
+    const productCogs = product.stockUnits > 0
+      ? Math.floor((product.stockValue * units) / product.stockUnits)
+      : 0;
+
+    post(state, { debit: 'cash', credit: 'revenue', amount: productRevenue, reason: `売上：${product.name}`, flow: 'operating' });
+    post(state, { debit: 'cogs', credit: 'inventory', amount: productCogs, reason: `売上原価：${product.name}` });
+
+    product.stockUnits -= units;
+    product.stockValue = Math.max(0, product.stockValue - productCogs);
+    if (product.stockUnits === 0) product.stockValue = 0;
+    product.totalUnitsSold += units;
+    product.totalRevenue += productRevenue;
+    product.lastWeekUnitsSold = units;
+
+    unitsSold += units;
+    revenue += productRevenue;
+    cogs += productCogs;
+  }
+
+  for (const market of evaluation.markets) {
+    if (market.demandUnits <= 0) continue;
+    let ownUnits = 0;
+    for (const item of saleItems) {
+      if (item.product.categoryId === market.categoryId) {
+        ownUnits += item.allocatedUnits;
+      }
+    }
+    categoryShares.push({
+      categoryId: market.categoryId,
+      demandUnits: market.demandUnits,
+      ownUnits,
+      shareBasis: Math.floor((ownUnits * 10000) / market.demandUnits),
+    });
   }
 
   for (const rival of state.rivals) {

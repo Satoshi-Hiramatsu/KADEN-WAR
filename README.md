@@ -7,7 +7,7 @@
 1953年のテレビ本放送、1955年の電気釜、1950年代後半の「三種の神器」ブームまで、製品が世に出る順番は実際の年代に合わせています。
 
 [![Cloudflare Workers](https://img.shields.io/badge/Deploy-Cloudflare%20Workers-orange.svg)](https://kaden-war.molkz.com/)
-[![Version](https://img.shields.io/badge/Version-V0.1.5-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-V0.1.6-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](tsconfig.json)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)](#素材名称の扱い)
 
@@ -180,7 +180,7 @@ PCなどの大画面では左右2カラムの一覧性に優れたダッシュ�
 
 ## 現在の実装状況とロードマップ
 
-**最新リリース: V0.1.3（製品分類に生産能力・資金・販路等のアンロック条件を追加・創業直後の役員会議と広告提案の不自然さを解消）**  
+**最新リリース: V0.1.6（複数製品発売時の販路工数公平配分（Max-Min Fairness）導入による販売台数ゼロ不具合の解消）**  
 *(※ゲーム製品版v1.0の完成ではありません)*
 
 | 分類 | 状態 | 実装内容 |
@@ -218,7 +218,7 @@ PCなどの大画面では左右2カラムの一覧性に優れたダッシュ�
 - **フロントエンド**: React 19.2, TypeScript 6.0, Zustand 5.0, Vite 8.2
 - **シミュレーション**: 純粋関数型設計の決定論的エンジン（`packages/simulation`）。UIとゲーム状態更新を完全に分離。
 - **インフラ**: Cloudflare Workers Static Assets（高速エッジ配信）, Cloudflare D1（Serverless SQL）
-- **テスト・品質管理**: Vitest 5.0（51テスト全通過）, ESLint 10.1, TypeScript strict型検査, Playwright E2Eスモーク検証
+- **テスト・品質管理**: Vitest 5.0（52テスト全通過）, ESLint 10.1, TypeScript strict型検査, Playwright E2Eスモーク検証
 
 ---
 
