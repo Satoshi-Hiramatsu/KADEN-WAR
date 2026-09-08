@@ -75,6 +75,10 @@ export function createGame(options: NewGameOptions): GameState {
     journal: [],
     log: [],
     lastWeek: null,
+    weeklyReports: [],
+    settings: {
+      showMonthlyBalanceSheetReport: true,
+    },
   };
 
   post(state, { debit: 'cash', credit: 'capital', amount: scenario.initialCapital, reason: '設立：資本金', flow: 'financing' });

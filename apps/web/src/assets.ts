@@ -301,6 +301,7 @@ export type SceneKey =
   | 'sales'
   | 'finance'
   | 'personnel'
+  | 'reports'
   | 'archive'
   | 'newspaper'
   | 'boom'
@@ -346,6 +347,7 @@ export function getSceneBackgroundUrl(sceneKey: SceneKey, game?: GameState): str
       return sceneMarketShop;
 
     case 'finance':
+    case 'reports':
       return sceneOfficeNight;
 
     case 'personnel':

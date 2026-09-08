@@ -3,8 +3,15 @@ import { createRoot } from 'react-dom/client';
 import { findCategory } from '../../../packages/content/src/categories';
 import { findFeature } from '../../../packages/content/src/features';
 import { economyRules } from '../../../packages/content/src/rules';
-import { formatBrand, formatMoney, formatUnitPrice } from '../../../packages/simulation/src/money';
-import { currentDate, getActiveAlerts, goalProgress, scenarioProgress } from '../../../packages/simulation/src/selectors';
+import { formatBasisAsPercent, formatBrand, formatMoney, formatUnitPrice } from '../../../packages/simulation/src/money';
+import {
+  currentDate,
+  getActiveAlerts,
+  goalProgress,
+  monthlyMetrics,
+  scenarioProgress,
+  weeklyMetrics,
+} from '../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../packages/simulation/src/types';
 import { DevelopmentMeeting } from './screens/DevelopmentMeeting';
 import { Factory } from './screens/Factory';
@@ -15,6 +22,7 @@ import { SalesOffice } from './screens/SalesOffice';
 import { Meeting } from './screens/Meeting';
 import { Personnel } from './screens/Personnel';
 import { Archive } from './screens/Archive';
+import { Reports } from './screens/Reports';
 import { Title } from './screens/Title';
 import {
   IconOffice,
@@ -25,6 +33,7 @@ import {
   IconFinance,
   IconPersonnel,
   IconArchive,
+  IconReport,
 } from './components/icons';
 import { useGameStore, type ScreenId } from './store';
 import './style.css';
@@ -38,6 +47,7 @@ const navigation: { id: ScreenId; label: string; role: string; icon: typeof Icon
   { id: 'sales', label: '販売本部', role: '販売統括', icon: IconSales },
   { id: 'finance', label: '経理部', role: '経理統括', icon: IconFinance },
   { id: 'personnel', label: '人事部', role: '人事統括', icon: IconPersonnel },
+  { id: 'reports', label: '経営報告', role: '資料室', icon: IconReport },
   { id: 'archive', label: '名機図鑑', role: '社史殿堂', icon: IconArchive },
 ];
 
@@ -59,6 +69,8 @@ function StickyHeader({
   const progress = scenarioProgress(game);
   const playing = game.status === 'playing';
   const morale = Math.round(game.company.personnel?.morale ?? 75);
+  const wMetrics = weeklyMetrics(game);
+  const mMetrics = monthlyMetrics(game);
 
   const currentNav = navigation.find(n => n.id === screen) ?? defaultNav;
   const CurrentIcon = currentNav.icon;
@@ -90,9 +102,17 @@ function StickyHeader({
           <p className="date" aria-live="polite">{currentDate(game)}</p>
         </div>
 
-        {/* PC向け全メトリクス表示 */}
+        {/* PC向け全メトリクス表示（週次・月次の売上高・粗利を常時表示） */}
         <dl className="topbar-metrics">
           <div className="topbar-metric-cash"><dt>現金</dt><dd>{formatMoney(game.company.accounts.cash)}</dd></div>
+          <div className="topbar-metric-highlight">
+            <dt>週次売上 / 粗利</dt>
+            <dd>{formatMoney(wMetrics.revenue)} <small className="metric-profit">（粗利 {formatMoney(wMetrics.grossProfit)}）</small></dd>
+          </div>
+          <div className="topbar-metric-highlight">
+            <dt>月次売上 / 粗利</dt>
+            <dd>{formatMoney(mMetrics.revenue)} <small className="metric-profit">（粗利 {formatMoney(mMetrics.grossProfit)}）</small></dd>
+          </div>
           <div><dt>ブランド</dt><dd>{formatBrand(game.company.brandBasis)}</dd></div>
           <div><dt>社員士気</dt><dd>{morale}点</dd></div>
           <div><dt>累計売上</dt><dd>{formatMoney(game.totals.revenue)}</dd></div>
@@ -224,6 +244,10 @@ function StickyHeader({
           <div className="mobile-panel-metrics">
             <dl className="mobile-metrics-grid">
               <div><dt>現金</dt><dd>{formatMoney(game.company.accounts.cash)}</dd></div>
+              <div><dt>週次売上</dt><dd>{formatMoney(wMetrics.revenue)}</dd></div>
+              <div><dt>週次粗利</dt><dd>{formatMoney(wMetrics.grossProfit)}</dd></div>
+              <div><dt>月次売上</dt><dd>{formatMoney(mMetrics.revenue)}</dd></div>
+              <div><dt>月次粗利</dt><dd>{formatMoney(mMetrics.grossProfit)}</dd></div>
               <div><dt>ブランド</dt><dd>{formatBrand(game.company.brandBasis)}</dd></div>
               <div><dt>社員士気</dt><dd>{morale}点</dd></div>
               <div><dt>累計売上</dt><dd>{formatMoney(game.totals.revenue)}</dd></div>
@@ -363,6 +387,224 @@ function CompletionNotice() {
   );
 }
 
+function MonthlyReportModal({ game }: { game: GameState }) {
+  const summary = useGameStore(store => store.monthlyReportModal);
+  const dismiss = useGameStore(store => store.dismissMonthlyReportModal);
+  const setScreen = useGameStore(store => store.setScreen);
+  const setMonthlyReportVisible = useGameStore(store => store.setMonthlyReportVisible);
+
+  if (!summary) return null;
+
+  const bs = summary.balanceSheet;
+  const isAutoShow = game.settings?.showMonthlyBalanceSheetReport !== false;
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="月次決算報告">
+      <div className="modal-content report-modal">
+        <div className="report-modal-header">
+          <div className="report-modal-badge">月次決算報告書</div>
+          <h2>{summary.label} 月次決算・貸借対照表（B/S）</h2>
+          <p className="report-modal-desc">
+            4週間の事業活動を締めました。当月の資産・負債・純資産および損益計算をご報告いたします。
+          </p>
+        </div>
+
+        <div className="report-modal-body">
+          {bs ? (
+            <div className="modal-section">
+              <h3>貸借対照表（バランスシート B/S）</h3>
+              <table className="bs-grid-table">
+                <thead>
+                  <tr>
+                    <th colSpan={2}>【資産の部】</th>
+                    <th colSpan={2}>【負債の部】</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>手元現金</td><td>{formatMoney(bs.cash)}</td>
+                    <td>借入金</td><td>{formatMoney(bs.debt)}</td>
+                  </tr>
+                  <tr>
+                    <td>商品在庫</td><td>{formatMoney(bs.inventory)}</td>
+                    <td>未払金</td><td>{formatMoney(bs.payable)}</td>
+                  </tr>
+                  <tr>
+                    <td>生産設備</td><td>{formatMoney(bs.equipment)}</td>
+                    <th scope="row">負債合計</th><th>{formatMoney(bs.liabilities)}</th>
+                  </tr>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <th colSpan={2}>【純資産の部】</th>
+                  </tr>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td>資本金</td><td>{formatMoney(bs.capital)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td>利益剰余金</td><td>{formatMoney(bs.retainedEarnings)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td>当期純利益</td><td>{formatMoney(bs.currentIncome)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <th scope="row">純資産合計</th><th>{formatMoney(bs.equity)}</th>
+                  </tr>
+                  <tr className="summary-row">
+                    <th>資産合計</th><th>{formatMoney(bs.assets)}</th>
+                    <th>負債・純資産計</th><th>{formatMoney(bs.liabilities + bs.equity)}</th>
+                  </tr>
+                </tbody>
+              </table>
+              <p className={bs.difference === 0 ? 'bs-check done' : 'bs-check warn'}>
+                {bs.difference === 0 ? '✓ 貸借一致（資産 ＝ 負債 ＋ 純資産）' : `⚠️ 貸借不一致: ${formatMoney(bs.difference)}`}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="modal-section">
+            <h3>損益計算（P/L）と月間経費の概要</h3>
+            <table className="modal-pl-table">
+              <tbody>
+                <tr><th>売上高</th><td>{formatMoney(summary.totals.revenue)}</td></tr>
+                <tr><th>売上原価</th><td>{formatMoney(summary.totals.cogs)}</td></tr>
+                <tr className="highlight-row"><th>売上総利益（粗利）</th><td><strong>{formatMoney(summary.totals.revenue - summary.totals.cogs)}</strong></td></tr>
+                {summary.expenseBreakdown ? (
+                  <>
+                    <tr><th>人件費</th><td>{formatMoney(summary.expenseBreakdown.labor)}</td></tr>
+                    <tr><th>販売・広告費</th><td>{formatMoney(summary.expenseBreakdown.selling)}</td></tr>
+                    <tr><th>研究開発費</th><td>{formatMoney(summary.expenseBreakdown.research + summary.expenseBreakdown.development)}</td></tr>
+                    <tr><th>減価償却費</th><td>{formatMoney(summary.expenseBreakdown.depreciation)}</td></tr>
+                    <tr><th>支払利息</th><td>{formatMoney(summary.expenseBreakdown.interest)}</td></tr>
+                  </>
+                ) : null}
+                <tr className="summary-row"><th>当期純損益</th><th>{formatMoney(summary.netIncome)}</th></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="report-modal-footer">
+          <label className="toggle-setting-label">
+            <input
+              type="checkbox"
+              checked={isAutoShow}
+              onChange={e => setMonthlyReportVisible(e.target.checked)}
+            />
+            <span>次回以降の月次B/S報告を自動表示する（オフにするとログ通知のみになり、経営報告室でいつでも確認可能）</span>
+          </label>
+          <div className="actions">
+            <button onClick={dismiss}>了解して業務を進める</button>
+            <button className="secondary" onClick={() => { dismiss(); setScreen('reports'); }}>
+              経営報告室で詳細を精査
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function YearlyReportModal() {
+  const summary = useGameStore(store => store.yearlyReportModal);
+  const dismiss = useGameStore(store => store.dismissYearlyReportModal);
+  const setScreen = useGameStore(store => store.setScreen);
+
+  if (!summary) return null;
+
+  const ratios = summary.financialRatios;
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="年次決算報告">
+      <div className="modal-content report-modal yearly-modal">
+        <div className="report-modal-header">
+          <div className="report-modal-badge gold">年次総決算</div>
+          <h2>{summary.label} 年次決算報告書（B/S・P/L・経営判断指標）</h2>
+          <p className="report-modal-desc">
+            1年間の営業期間を満了し、年次総決算を迎えました。貸借対照表・P/Lおよび経営判断材料をご報告いたします。
+          </p>
+        </div>
+
+        {summary.reviewComment ? (
+          <div className="npc-callout annual-review-callout">
+            <div>
+              <strong>経理統括・財務責任者 決算総括所見</strong>
+              <p className="annual-review-text">「{summary.reviewComment}」</p>
+            </div>
+          </div>
+        ) : null}
+
+        {ratios ? (
+          <div className="modal-section">
+            <h3>重要経営判断指標（財務分析レシオ）</h3>
+            <div className="ratios-grid">
+              <div className="ratio-card">
+                <span className="ratio-label">売上高総利益率（粗利率）</span>
+                <strong className="ratio-value">{formatBasisAsPercent(ratios.grossMarginBasis)}</strong>
+                <small>製品付加価値</small>
+              </div>
+              <div className="ratio-card">
+                <span className="ratio-label">売上高営業利益率</span>
+                <strong className="ratio-value">{formatBasisAsPercent(ratios.operatingMarginBasis)}</strong>
+                <small>本業の稼ぐ力</small>
+              </div>
+              <div className="ratio-card">
+                <span className="ratio-label">自己資本比率</span>
+                <strong className="ratio-value">{formatBasisAsPercent(ratios.equityRatioBasis)}</strong>
+                <small>財務健全性</small>
+              </div>
+              <div className="ratio-card">
+                <span className="ratio-label">手元流動性</span>
+                <strong className="ratio-value">{ratios.currentLiquidityMonths}か月分</strong>
+                <small>手元現金の余裕度</small>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="report-modal-body">
+          <div className="modal-section">
+            <h3>損益実績（年間P/L）</h3>
+            <table className="modal-pl-table">
+              <tbody>
+                <tr><th>年間売上高</th><td>{formatMoney(summary.totals.revenue)}</td></tr>
+                <tr><th>売上原価</th><td>{formatMoney(summary.totals.cogs)}</td></tr>
+                <tr className="highlight-row"><th>売上総利益（粗利）</th><td><strong>{formatMoney(summary.totals.revenue - summary.totals.cogs)}</strong></td></tr>
+                <tr className="summary-row"><th>当期純損益</th><th>{formatMoney(summary.netIncome)}</th></tr>
+              </tbody>
+            </table>
+          </div>
+
+          {summary.balanceSheet ? (
+            <div className="modal-section">
+              <h3>期末貸借対照表（B/S）</h3>
+              <table className="modal-pl-table">
+                <tbody>
+                  <tr><th>総資産</th><td>{formatMoney(summary.balanceSheet.assets)}</td></tr>
+                  <tr><th>総負債（借入・未払）</th><td>{formatMoney(summary.balanceSheet.liabilities)}</td></tr>
+                  <tr className="summary-row"><th>純資産合計</th><th>{formatMoney(summary.balanceSheet.equity)}</th></tr>
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="report-modal-footer">
+          <div className="actions">
+            <button onClick={dismiss}>年次決算を承認して次年度へ</button>
+            <button className="secondary" onClick={() => { dismiss(); setScreen('reports'); }}>
+              経営報告室で全データを精査
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Result({ game }: { game: GameState }) {
   const quit = useGameStore(store => store.quitToTitle);
   const goals = goalProgress(game);
@@ -415,6 +657,8 @@ function App() {
       <Notice />
       <FundsDialog game={game} />
       <CompletionNotice />
+      <MonthlyReportModal game={game} />
+      <YearlyReportModal />
       {game.status !== 'playing' ? <Result game={game} /> : null}
       {screen === 'office' ? <Office game={game} /> : null}
       {screen === 'meeting' ? <Meeting game={game} /> : null}
@@ -424,6 +668,7 @@ function App() {
       {screen === 'sales' ? <SalesOffice game={game} /> : null}
       {screen === 'finance' ? <Finance game={game} /> : null}
       {screen === 'personnel' ? <Personnel game={game} /> : null}
+      {screen === 'reports' ? <Reports game={game} /> : null}
       {screen === 'archive' ? <Archive game={game} /> : null}
       <footer>
         月初の役員会議で方針を決定し、週送り・月送りで研究・開発・生産・販売・決算を進めます。

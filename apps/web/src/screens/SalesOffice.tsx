@@ -5,7 +5,7 @@ import { categories, findCategory, demandUnitsAt, unitsFromWorkload } from '../.
 import { weeksPerYear } from '../../../../packages/content/src/rules';
 import { formatBasisAsPercent, formatMoney, formatUnitPrice, formatUnits } from '../../../../packages/simulation/src/money';
 import { channelCapacityWorkload, forecastProductAtPrice } from '../../../../packages/simulation/src/market';
-import { departmentReports, marketForecast, maxProductionUnitsFor } from '../../../../packages/simulation/src/selectors';
+import { departmentReports, marketForecast, maxProductionUnitsFor, productPerformanceList } from '../../../../packages/simulation/src/selectors';
 import type { GameState, Product } from '../../../../packages/simulation/src/types';
 import {
   ExecutiveHeader,
@@ -295,9 +295,63 @@ export function SalesOffice({ game }: { game: GameState }) {
 
       <PricingStrategyPanel game={game} products={products} salesWorkload={salesWorkload} currentYear={currentYear} />
 
+      {products.length > 0 ? (
+        <Panel eyebrow="02 / 製品別業績" title="販売台数・売上高・粗利の実績">
+          <div className="desktop-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>製品名</th>
+                  <th>価格 / 製造原価</th>
+                  <th>先週販売（台数 / 売上 / 粗利）</th>
+                  <th>当月販売（台数 / 売上 / 粗利）</th>
+                  <th>累計販売台数</th>
+                  <th>累計売上高</th>
+                  <th>累計粗利（粗利率）</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productPerformanceList(game).map(item => {
+                  const category = findCategory(item.categoryId);
+                  return (
+                    <tr key={item.productId}>
+                      <th scope="row">
+                        <div className="product-cell">
+                          <ProductSprite categoryId={item.categoryId} year={currentYear} size="sm" />
+                          <div className="product-cell-info">
+                            <span>{item.name}</span>
+                            <small>{category?.name ?? item.categoryId} {item.onSale ? '（販売中）' : '（停止中）'}</small>
+                          </div>
+                        </div>
+                      </th>
+                      <td>{formatUnitPrice(item.price)} <small>/ 原価 {formatUnitPrice(item.unitCost)}</small></td>
+                      <td>
+                        <div>{formatUnits(item.lastWeekUnitsSold)}台</div>
+                        <small>売上 {formatMoney(item.lastWeekRevenue)} / 粗利 {formatMoney(item.lastWeekGrossProfit)}</small>
+                      </td>
+                      <td>
+                        <div>{formatUnits(item.monthUnitsSold)}台</div>
+                        <small>売上 {formatMoney(item.monthRevenue)} / 粗利 {formatMoney(item.monthGrossProfit)}</small>
+                      </td>
+                      <td><strong>{formatUnits(item.totalUnitsSold)}台</strong></td>
+                      <td>{formatMoney(item.totalRevenue)}</td>
+                      <td>
+                        <strong>{formatMoney(item.totalGrossProfit)}</strong>
+                        <small>（{formatBasisAsPercent(item.totalGrossMarginBasis)}）</small>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <small>「粗利」は売上高から製造原価を差し引いた利益額です。高付加価値な製品ほど高い粗利率を達成できます。</small>
+        </Panel>
+      ) : null}
+
       <ScreenColumns variant="side-first">
         <ScreenColumn>
-          <Panel eyebrow="02 / 広告宣伝" title="マーケティング戦略">
+          <Panel eyebrow="03 / 広告宣伝" title="マーケティング戦略">
             <p>
               店頭の実演から新聞広告、やがてはラジオCM・テレビCMへ。
               打てる媒体はその年に世の中にあるものだけで、時代が進むほど手が増えていきます。

@@ -411,3 +411,132 @@ export function getActiveAlerts(state: GameState): SystemAlert[] {
   return alerts;
 }
 
+export type PeriodMetrics = {
+  revenue: Money;
+  cogs: Money;
+  grossProfit: Money;
+  grossMarginBasis: number;
+};
+
+export function weeklyMetrics(state: GameState): PeriodMetrics {
+  const week = state.lastWeek;
+  if (!week) {
+    return { revenue: 0, cogs: 0, grossProfit: 0, grossMarginBasis: 0 };
+  }
+  const grossProfit = week.revenue - week.cogs;
+  const grossMarginBasis = week.revenue > 0 ? Math.floor((grossProfit * 10000) / week.revenue) : 0;
+  return {
+    revenue: week.revenue,
+    cogs: week.cogs,
+    grossProfit,
+    grossMarginBasis,
+  };
+}
+
+export function monthlyMetrics(state: GameState): PeriodMetrics {
+  const totals = state.monthTotals;
+  const grossProfit = totals.revenue - totals.cogs;
+  const grossMarginBasis = totals.revenue > 0 ? Math.floor((grossProfit * 10000) / totals.revenue) : 0;
+  return {
+    revenue: totals.revenue,
+    cogs: totals.cogs,
+    grossProfit,
+    grossMarginBasis,
+  };
+}
+
+export type MonthlyExpenseItem = {
+  category: string;
+  amount: Money;
+  ratioPercent: string;
+  note?: string;
+};
+
+export function monthlyExpenseBreakdown(state: GameState): { items: MonthlyExpenseItem[]; total: Money } {
+  const totals = state.monthTotals;
+  const items: { category: string; amount: Money; note?: string }[] = [
+    { category: '人件費', amount: totals.laborExpense, note: '従業員の週給' },
+    { category: '販売・広告費', amount: totals.sellingExpense, note: '販路維持費・広告出稿・手数料' },
+    { category: '研究費', amount: totals.researchExpense, note: '技術テーマ研究予算' },
+    { category: '開発費', amount: totals.developmentExpense, note: '進行中プロジェクトの開発分担金' },
+    { category: '減価償却費', amount: totals.depreciationExpense, note: '工作機械設備の減価償却' },
+    { category: '支払利息', amount: totals.interestExpense, note: '借入金の利息' },
+  ];
+  const total = items.reduce((sum, item) => sum + item.amount, 0);
+  const formatted: MonthlyExpenseItem[] = items.map(item => ({
+    category: item.category,
+    amount: item.amount,
+    ratioPercent: total > 0 ? `${Math.round((item.amount * 100) / total)}%` : '0%',
+    note: item.note,
+  }));
+  return { items: formatted, total };
+}
+
+export type ProductPerformance = {
+  productId: string;
+  name: string;
+  categoryId: string;
+  price: number;
+  unitCost: number;
+  onSale: boolean;
+  stockUnits: number;
+  // 累計実績
+  totalUnitsSold: number;
+  totalRevenue: Money;
+  totalCogs: Money;
+  totalGrossProfit: Money;
+  totalGrossMarginBasis: number;
+  // 先週実績
+  lastWeekUnitsSold: number;
+  lastWeekRevenue: Money;
+  lastWeekCogs: Money;
+  lastWeekGrossProfit: Money;
+  // 当月（進行中）実績
+  monthUnitsSold: number;
+  monthRevenue: Money;
+  monthCogs: Money;
+  monthGrossProfit: Money;
+};
+
+export function productPerformanceList(state: GameState): ProductPerformance[] {
+  return state.company.products.map(product => {
+    const totalCogs = product.totalCogs ?? Math.floor(product.totalRevenue * 0.78);
+    const totalGrossProfit = product.totalRevenue - totalCogs;
+    const totalGrossMarginBasis = product.totalRevenue > 0
+      ? Math.floor((totalGrossProfit * 10000) / product.totalRevenue)
+      : 0;
+
+    const lastWeekRevenue = product.lastWeekRevenue ?? 0;
+    const lastWeekCogs = product.lastWeekCogs ?? 0;
+    const lastWeekGrossProfit = lastWeekRevenue - lastWeekCogs;
+
+    const monthUnitsSold = product.monthUnitsSold ?? 0;
+    const monthRevenue = product.monthRevenue ?? 0;
+    const monthCogs = product.monthCogs ?? 0;
+    const monthGrossProfit = monthRevenue - monthCogs;
+
+    return {
+      productId: product.id,
+      name: product.name,
+      categoryId: product.categoryId,
+      price: product.price,
+      unitCost: product.unitCost,
+      onSale: product.onSale,
+      stockUnits: product.stockUnits,
+      totalUnitsSold: product.totalUnitsSold,
+      totalRevenue: product.totalRevenue,
+      totalCogs,
+      totalGrossProfit,
+      totalGrossMarginBasis,
+      lastWeekUnitsSold: product.lastWeekUnitsSold,
+      lastWeekRevenue,
+      lastWeekCogs,
+      lastWeekGrossProfit,
+      monthUnitsSold,
+      monthRevenue,
+      monthCogs,
+      monthGrossProfit,
+    };
+  });
+}
+

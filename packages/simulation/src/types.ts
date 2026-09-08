@@ -49,6 +49,68 @@ export type PeriodTotals = {
   unitsSold: number;
 };
 
+export type IncomeStatement = {
+  revenue: Money;
+  cogs: Money;
+  grossProfit: Money;
+  sellingExpense: Money;
+  researchExpense: Money;
+  developmentExpense: Money;
+  laborExpense: Money;
+  depreciationExpense: Money;
+  operatingIncome: Money;
+  interestExpense: Money;
+  netIncome: Money;
+};
+
+export type BalanceSheet = {
+  cash: Money;
+  inventory: Money;
+  equipment: Money;
+  assets: Money;
+  debt: Money;
+  payable: Money;
+  liabilities: Money;
+  capital: Money;
+  retainedEarnings: Money;
+  currentIncome: Money;
+  equity: Money;
+  difference: Money;
+};
+
+export type ProductSalesBreakdown = {
+  productId: string;
+  productName: string;
+  categoryId: CategoryId;
+  unitsSold: number;
+  revenue: Money;
+  cogs: Money;
+  grossProfit: Money;
+};
+
+export type ExpenseBreakdown = {
+  labor: Money;
+  selling: Money;
+  research: Money;
+  development: Money;
+  depreciation: Money;
+  interest: Money;
+  total: Money;
+};
+
+export type FinancialRatios = {
+  grossMarginBasis: number;
+  operatingMarginBasis: number;
+  netMarginBasis: number;
+  equityRatioBasis: number;
+  currentLiquidityMonths: number;
+  debtRatioBasis: number;
+  roaBasis?: number;
+  roeBasis?: number;
+  revenueGrowthBasis?: number;
+  profitGrowthBasis?: number;
+};
+
 export type PeriodSummary = {
   label: string;
   kind: 'month' | 'year';
@@ -57,6 +119,12 @@ export type PeriodSummary = {
   totals: PeriodTotals;
   netIncome: Money;
   cashEnd: Money;
+  balanceSheet?: BalanceSheet;
+  incomeStatement?: IncomeStatement;
+  expenseBreakdown?: ExpenseBreakdown;
+  productSales?: ProductSalesBreakdown[];
+  financialRatios?: FinancialRatios;
+  reviewComment?: string;
 };
 
 export type ResearchState = {
@@ -117,9 +185,19 @@ export type Product = {
   totalUnitsProduced: number;
   totalUnitsSold: number;
   totalRevenue: Money;
+  /** 累計の売上原価（万円）。累計粗利の算出に使う。 */
+  totalCogs?: Money;
   lastWeekUnitsSold: number;
   lastWeekShareBasis: number;
   lastWeekUnitsProduced?: number;
+  lastWeekRevenue?: Money;
+  lastWeekCogs?: Money;
+  /** 当月累計（進行中月）の販売台数 */
+  monthUnitsSold?: number;
+  /** 当月累計の売上高（万円） */
+  monthRevenue?: Money;
+  /** 当月累計の売上原価（万円） */
+  monthCogs?: Money;
   advancement: number;
   novelty: number;
   practicality: number;
@@ -249,6 +327,7 @@ export type WeeklyReport = {
   defectUnits: number;
   categoryShares: { categoryId: CategoryId; demandUnits: number; ownUnits: number; shareBasis: number }[];
   productionShortfalls?: ProductionShortfall[];
+  productSales?: ProductSalesBreakdown[];
 };
 
 export type SystemAlertLevel = 'critical' | 'warning' | 'info';
@@ -270,6 +349,10 @@ export type ScenarioProgress = {
 };
 
 export type GameStatus = 'playing' | 'won' | 'lost';
+
+export type GameSettings = {
+  showMonthlyBalanceSheetReport: boolean;
+};
 
 export type GameState = {
   schemaVersion: 1;
@@ -298,6 +381,8 @@ export type GameState = {
   journal: JournalEntry[];
   log: EventLogEntry[];
   lastWeek: WeeklyReport | null;
+  weeklyReports: WeeklyReport[];
+  settings?: GameSettings;
 };
 
 export type CommandResult =

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { loanLimit } from '../../../../packages/simulation/src/commands';
 import { formatMoney } from '../../../../packages/simulation/src/money';
-import { departmentReports, financeView } from '../../../../packages/simulation/src/selectors';
+import { departmentReports, financeView, monthlyExpenseBreakdown } from '../../../../packages/simulation/src/selectors';
 import type { GameState } from '../../../../packages/simulation/src/types';
 import {
   ExecutiveHeader,
@@ -13,13 +13,18 @@ import {
   ScreenColumns,
   NpcPortrait,
 } from '../components/ui';
+import { IconReport } from '../components/icons';
 import { useGameStore } from '../store';
 
 export function Finance({ game }: { game: GameState }) {
   const dispatch = useGameStore(store => store.dispatch);
+  const setScreen = useGameStore(store => store.setScreen);
+  const setMonthlyReportVisible = useGameStore(store => store.setMonthlyReportVisible);
   const report = departmentReports(game).find(entry => entry.executiveId === 'finance');
   const view = financeView(game);
   const [amount, setAmount] = useState(1000);
+  const expenseBreakdown = monthlyExpenseBreakdown(game);
+  const isAutoShowBS = game.settings?.showMonthlyBalanceSheetReport !== false;
 
   const profitAndLoss = [
     { label: '売上高', month: view.monthly.revenue, year: view.yearly.revenue },
@@ -39,6 +44,19 @@ export function Finance({ game }: { game: GameState }) {
     <>
       <SceneBanner sceneKey="finance" game={game} eyebrow="経理部" title="財務・損益・資金管理">
         {report ? <ExecutiveHeader report={report} game={game} /> : null}
+        <div className="finance-top-controls">
+          <button className="secondary" onClick={() => setScreen('reports')}>
+            <IconReport size={16} /> 経営報告書・決算書アーカイブを開く
+          </button>
+          <label className="toggle-setting-label inline">
+            <input
+              type="checkbox"
+              checked={isAutoShowBS}
+              onChange={e => setMonthlyReportVisible(e.target.checked)}
+            />
+            <span>月次決算時、貸借対照表（B/S）報告を自動表示する</span>
+          </label>
+        </div>
       </SceneBanner>
 
       <ScreenColumns variant="even">
@@ -59,6 +77,31 @@ export function Finance({ game }: { game: GameState }) {
               </tbody>
             </table>
             <small>月次は4週、年次は48週の境界で締めます。締めた月の純損益の合計が累計利益になります。</small>
+          </Panel>
+
+          <Panel eyebrow="02 / 経費内訳（月単位）" title="人件費・広告宣伝費・固定費の分析">
+            <table>
+              <thead>
+                <tr><th>経費項目</th><th>当月累計金額</th><th>構成比</th><th>補足</th></tr>
+              </thead>
+              <tbody>
+                {expenseBreakdown.items.map(item => (
+                  <tr key={item.category}>
+                    <th scope="row">{item.category}</th>
+                    <td><strong>{formatMoney(item.amount)}</strong></td>
+                    <td>{item.ratioPercent}</td>
+                    <td><small>{item.note}</small></td>
+                  </tr>
+                ))}
+                <tr className="summary-row">
+                  <th>経費合計</th>
+                  <th>{formatMoney(expenseBreakdown.total)}</th>
+                  <th>100%</th>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+            <small>販売・広告費には系列店維持費や広告出稿費、手数料が含まれます。人件費は従業員給与です。</small>
           </Panel>
 
           <Panel eyebrow="05 / 決算" title="締めた期間">

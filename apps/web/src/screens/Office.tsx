@@ -17,7 +17,7 @@ import {
   NpcPortrait,
   RivalPortrait,
 } from '../components/ui';
-import { IconMeeting, IconNews, IconArchive } from '../components/icons';
+import { IconMeeting, IconNews, IconArchive, IconReport } from '../components/icons';
 import { getSceneBackgroundUrl } from '../assets';
 import { useGameStore } from '../store';
 
@@ -47,6 +47,9 @@ export function Office({ game }: { game: GameState }) {
             </div>
             <button onClick={() => setScreen('meeting')}>役員会議を開く</button>
           </div>
+          <button className="secondary" onClick={() => setScreen('reports')}>
+            <IconReport size={16} /> 経営報告書アーカイブ
+          </button>
           <button className="secondary" onClick={() => setScreen('archive')}>
             <IconArchive size={16} /> 歴代名機図鑑を見る
           </button>

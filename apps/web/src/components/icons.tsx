@@ -194,3 +194,13 @@ export function IconCheck({ size = 20, ...props }: IconProps) {
     </svg>
   );
 }
+
+/** 経営報告書・決算書アイコン */
+export function IconReport({ size = 20, ...props }: IconProps) {
+  return (
+    <svg width={size} height={size} {...defaultProps} {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+

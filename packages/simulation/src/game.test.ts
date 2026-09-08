@@ -5,7 +5,13 @@ import { defaultModuleIds, emptyCategoryUnlockContext, evaluateCategoryUnlock, e
 import { stateHash } from './hash';
 import { balanceSheet, cashFlowStatement } from './ledger';
 import { evaluateDevelopmentMeeting } from './meeting';
-import { buildCategoryUnlockContext } from './selectors';
+import {
+  buildCategoryUnlockContext,
+  monthlyExpenseBreakdown,
+  monthlyMetrics,
+  productPerformanceList,
+  weeklyMetrics,
+} from './selectors';
 import { createGame } from './setup';
 import { advanceWeek, advanceWeeks, productionCapacityWorkload } from './week';
 import type { GameState } from './types';
@@ -101,6 +107,62 @@ describe('時間の進行', () => {
     expect(stateHash(first)).toBe(stateHash(second));
     const other = advance(releaseFirstProduct(newGame(778)), 40);
     expect(stateHash(other)).not.toBe(stateHash(first));
+  });
+
+  it('週次レポート履歴（weeklyReports）が記録され、製品別販売実績が保持される', () => {
+    const released = releaseFirstProduct(newGame()); // ここで8週進行
+    expect(released.weeklyReports.length).toBe(8);
+    const state = advance(released, 8); // さらに8週進行
+    expect(state.weeklyReports.length).toBe(16);
+    const lastReport = state.weeklyReports.at(-1);
+    expect(lastReport).toBeDefined();
+    expect(lastReport?.revenue).toBeGreaterThanOrEqual(0);
+    if (lastReport && lastReport.revenue > 0 && lastReport.productSales && lastReport.productSales.length > 0) {
+      const firstSale = lastReport.productSales[0]!;
+      expect(firstSale.grossProfit).toBe(firstSale.revenue - firstSale.cogs);
+    }
+  });
+
+  it('月次決算にB/S・P/L・経費内訳・製品別実績が保存され、年次決算に経営指標が付与される', () => {
+    const released = releaseFirstProduct(newGame());
+    const state = advance(released, 48 - released.week);
+    expect(state.monthlySummaries.length).toBe(12);
+    const monthSummary = state.monthlySummaries[0]!;
+    expect(monthSummary.balanceSheet).toBeDefined();
+    expect(monthSummary.balanceSheet?.assets).toBeGreaterThan(0);
+    expect(monthSummary.expenseBreakdown).toBeDefined();
+    expect(monthSummary.expenseBreakdown?.total).toBeGreaterThanOrEqual(0);
+
+    expect(state.yearlySummaries.length).toBe(1);
+    const yearSummary = state.yearlySummaries[0]!;
+    expect(yearSummary.balanceSheet).toBeDefined();
+    expect(yearSummary.financialRatios).toBeDefined();
+    expect(yearSummary.financialRatios?.grossMarginBasis).toBeDefined();
+    expect(yearSummary.financialRatios?.equityRatioBasis).toBeDefined();
+    expect(yearSummary.reviewComment).toBeDefined();
+    expect(typeof yearSummary.reviewComment).toBe('string');
+  });
+
+  it('財務セレクタ（weeklyMetrics, monthlyMetrics, monthlyExpenseBreakdown, productPerformanceList）が動作する', () => {
+    const released = releaseFirstProduct(newGame());
+    const state = advance(released, 5);
+    const wMetrics = weeklyMetrics(state);
+    expect(wMetrics.grossProfit).toBe(wMetrics.revenue - wMetrics.cogs);
+
+    const mMetrics = monthlyMetrics(state);
+    expect(mMetrics.grossProfit).toBe(mMetrics.revenue - mMetrics.cogs);
+
+    const expenseBreakdown = monthlyExpenseBreakdown(state);
+    expect(expenseBreakdown.items.length).toBe(6);
+    expect(expenseBreakdown.total).toBeGreaterThanOrEqual(0);
+
+    const perfList = productPerformanceList(state);
+    expect(perfList.length).toBe(state.company.products.length);
+    if (perfList.length > 0) {
+      const p = perfList[0]!;
+      expect(p.totalGrossProfit).toBe(p.totalRevenue - p.totalCogs);
+      expect(p.lastWeekGrossProfit).toBe(p.lastWeekRevenue - p.lastWeekCogs);
+    }
   });
 });
 

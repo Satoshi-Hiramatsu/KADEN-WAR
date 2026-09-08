@@ -1,11 +1,15 @@
 import { assertMoney } from './money';
 import type {
   AccountId,
+  BalanceSheet,
   CashFlowCategory,
   GameState,
+  IncomeStatement,
   Money,
   PeriodTotals,
 } from './types';
+
+export type { BalanceSheet, IncomeStatement };
 
 const debitNormalAccounts: readonly AccountId[] = [
   'cash', 'inventory', 'equipment', 'cogs', 'sellingExpense', 'researchExpense',
@@ -118,20 +122,6 @@ export function payCash(
   return { paid, unpaid };
 }
 
-export type IncomeStatement = {
-  revenue: Money;
-  cogs: Money;
-  grossProfit: Money;
-  sellingExpense: Money;
-  researchExpense: Money;
-  developmentExpense: Money;
-  laborExpense: Money;
-  depreciationExpense: Money;
-  operatingIncome: Money;
-  interestExpense: Money;
-  netIncome: Money;
-};
-
 export function incomeStatement(totals: PeriodTotals): IncomeStatement {
   const grossProfit = totals.revenue - totals.cogs;
   const operatingIncome = grossProfit
@@ -151,21 +141,6 @@ export function incomeStatement(totals: PeriodTotals): IncomeStatement {
     netIncome: operatingIncome - totals.interestExpense,
   };
 }
-
-export type BalanceSheet = {
-  cash: Money;
-  inventory: Money;
-  equipment: Money;
-  assets: Money;
-  debt: Money;
-  payable: Money;
-  liabilities: Money;
-  capital: Money;
-  retainedEarnings: Money;
-  currentIncome: Money;
-  equity: Money;
-  difference: Money;
-};
 
 /** 台帳の残高から貸借対照表を導く。当期損益は未振替の収益・費用から求める。 */
 export function balanceSheet(state: GameState): BalanceSheet {

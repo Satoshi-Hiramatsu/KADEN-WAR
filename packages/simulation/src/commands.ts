@@ -41,7 +41,8 @@ export type Command =
   | { type: 'payBonus'; amountPerEmployee: Money }
   | { type: 'acceptProposal'; proposalId: string }
   | { type: 'retireProduct'; productId: string }
-  | { type: 'minorChangeProduct'; productId: string };
+  | { type: 'minorChangeProduct'; productId: string }
+  | { type: 'setMonthlyReportVisible'; visible: boolean };
 
 export function loanLimit(state: GameState): Money {
   const capital = state.company.accounts.capital;
@@ -381,7 +382,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
           price: product.price,
           totalUnitsSold: product.totalUnitsSold,
           totalRevenue: product.totalRevenue,
-          totalProfit: Math.floor(product.totalRevenue * 0.22),
+          totalProfit: product.totalCogs !== undefined ? (product.totalRevenue - product.totalCogs) : Math.floor(product.totalRevenue * 0.22),
           peakShareBasis: product.lastWeekShareBasis,
           rank,
           awards,
@@ -399,6 +400,13 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       payCash(draft, { debit: 'developmentExpense', amount: cost, reason: `${product.name}のマイナーチェンジ`, flow: 'operating' });
       product.releasedWeek = draft.week;
       product.performance += 2;
+      break;
+    }
+    case 'setMonthlyReportVisible': {
+      draft.settings = {
+        ...(draft.settings ?? { showMonthlyBalanceSheetReport: true }),
+        showMonthlyBalanceSheetReport: command.visible,
+      };
       break;
     }
   }

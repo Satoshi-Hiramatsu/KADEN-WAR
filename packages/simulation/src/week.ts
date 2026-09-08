@@ -6,6 +6,7 @@ import { findHistoricalEvent } from '../../content/src/events';
 import { findResearchTheme, productionBonus, techName, researchThemes } from '../../content/src/technology';
 import { calendarLabel } from './calendar';
 import {
+  balanceSheet,
   closeIncomeToRetainedEarnings,
   emptyPeriodTotals,
   incomeStatement,
@@ -24,11 +25,14 @@ import { calculateEffectiveUnitCost, factoryCapacityUtilization } from './produc
 import type {
   AdvanceResult,
   CategoryId,
+  ExpenseBreakdown,
+  FinancialRatios,
   GameState,
   MeetingProposal,
   Money,
   PeriodSummary,
   Product,
+  ProductSalesBreakdown,
   ProductionShortfall,
   WeeklyReport,
 } from './types';
@@ -245,6 +249,7 @@ type SalesResult = {
   revenue: Money;
   cogs: Money;
   categoryShares: WeeklyReport['categoryShares'];
+  productSales: ProductSalesBreakdown[];
 };
 
 function runSales(state: GameState): SalesResult {
@@ -257,10 +262,13 @@ function runSales(state: GameState): SalesResult {
   let revenue = 0;
   let cogs = 0;
   const categoryShares: WeeklyReport['categoryShares'] = [];
+  const productSales: ProductSalesBreakdown[] = [];
 
   for (const product of company.products) {
     product.lastWeekUnitsSold = 0;
     product.lastWeekShareBasis = 0;
+    product.lastWeekRevenue = 0;
+    product.lastWeekCogs = 0;
   }
 
   type PlayerSaleItem = {
@@ -377,7 +385,24 @@ function runSales(state: GameState): SalesResult {
     if (product.stockUnits === 0) product.stockValue = 0;
     product.totalUnitsSold += units;
     product.totalRevenue += productRevenue;
+    product.totalCogs = (product.totalCogs ?? 0) + productCogs;
     product.lastWeekUnitsSold = units;
+    product.lastWeekRevenue = productRevenue;
+    product.lastWeekCogs = productCogs;
+    product.monthUnitsSold = (product.monthUnitsSold ?? 0) + units;
+    product.monthRevenue = (product.monthRevenue ?? 0) + productRevenue;
+    product.monthCogs = (product.monthCogs ?? 0) + productCogs;
+
+    const grossProfit = productRevenue - productCogs;
+    productSales.push({
+      productId: product.id,
+      productName: product.name,
+      categoryId: product.categoryId,
+      unitsSold: units,
+      revenue: productRevenue,
+      cogs: productCogs,
+      grossProfit,
+    });
 
     unitsSold += units;
     revenue += productRevenue;
@@ -419,7 +444,7 @@ function runSales(state: GameState): SalesResult {
   state.totals.unitsSold += unitsSold;
   state.totals.revenue += revenue;
 
-  return { unitsSold, revenue, cogs, categoryShares };
+  return { unitsSold, revenue, cogs, categoryShares, productSales };
 }
 
 function updateBrand(state: GameState, shares: WeeklyReport['categoryShares']): void {
@@ -444,10 +469,119 @@ function updateBrand(state: GameState, shares: WeeklyReport['categoryShares']): 
   company.brandBasis = Math.max(0, Math.min(10000, next));
 }
 
+function generateFinancialReview(
+  statement: ReturnType<typeof incomeStatement>,
+  ratios: FinancialRatios,
+): string {
+  const points: string[] = [];
+  if (statement.netIncome > 0) {
+    if (ratios.operatingMarginBasis >= 1500) {
+      points.push('営業利益率が15%を超え、極めて高い本業収益力を誇っています。');
+    } else if (ratios.operatingMarginBasis >= 800) {
+      points.push('本業の営業利益は堅調に推移しています。');
+    } else {
+      points.push('黒字を確保したものの、薄利傾向にあります。原価低減や付加価値の向上が望まれます。');
+    }
+  } else {
+    points.push('当期は最終赤字となりました。固定費の圧縮や不採算製品の整理が喫緊の課題です。');
+  }
+
+  if (ratios.equityRatioBasis >= 5000) {
+    points.push('自己資本比率が50%以上あり、財務健全性は盤石です。');
+  } else if (ratios.equityRatioBasis >= 2500) {
+    points.push('借入と自己資本のバランスは標準的です。');
+  } else {
+    points.push('借入金比率が高く、自己資本比率が低迷しています。キャッシュフローの急変にご注意ください。');
+  }
+
+  if (ratios.currentLiquidityMonths < 1.0) {
+    points.push('手元現金が月商1ヶ月分を下回っており、資金繰りに余裕がありません。');
+  } else if (ratios.currentLiquidityMonths >= 3.0) {
+    points.push('手元資金は十分に潤沢であり、新製品開発や設備投資への積極配分が可能です。');
+  }
+
+  return points.join(' ');
+}
+
 function closePeriod(state: GameState, kind: 'month' | 'year'): PeriodSummary {
   const totals = kind === 'month' ? state.monthTotals : state.yearTotals;
   const startWeek = kind === 'month' ? state.monthStartWeek : state.yearStartWeek;
   const statement = incomeStatement(totals);
+  const bs = balanceSheet(state);
+
+  const expenseBreakdown: ExpenseBreakdown = {
+    labor: totals.laborExpense,
+    selling: totals.sellingExpense,
+    research: totals.researchExpense,
+    development: totals.developmentExpense,
+    depreciation: totals.depreciationExpense,
+    interest: totals.interestExpense,
+    total: totals.laborExpense + totals.sellingExpense + totals.researchExpense
+      + totals.developmentExpense + totals.depreciationExpense + totals.interestExpense,
+  };
+
+  const relevantReports = (state.weeklyReports ?? []).filter(
+    r => r.week >= startWeek && r.week < state.week,
+  );
+  const productSalesMap = new Map<string, ProductSalesBreakdown>();
+  for (const r of relevantReports) {
+    if (!r.productSales) continue;
+    for (const ps of r.productSales) {
+      const existing = productSalesMap.get(ps.productId);
+      if (existing) {
+        existing.unitsSold += ps.unitsSold;
+        existing.revenue += ps.revenue;
+        existing.cogs += ps.cogs;
+        existing.grossProfit += ps.grossProfit;
+      } else {
+        productSalesMap.set(ps.productId, { ...ps });
+      }
+    }
+  }
+  const productSales = [...productSalesMap.values()];
+
+  let financialRatios: FinancialRatios | undefined;
+  let reviewComment: string | undefined;
+
+  if (kind === 'year') {
+    const grossMarginBasis = totals.revenue > 0 ? Math.floor((statement.grossProfit * 10000) / totals.revenue) : 0;
+    const operatingMarginBasis = totals.revenue > 0 ? Math.floor((statement.operatingIncome * 10000) / totals.revenue) : 0;
+    const netMarginBasis = totals.revenue > 0 ? Math.floor((statement.netIncome * 10000) / totals.revenue) : 0;
+    const equityRatioBasis = bs.assets > 0 ? Math.floor((bs.equity * 10000) / bs.assets) : 0;
+    const debtRatioBasis = bs.assets > 0 ? Math.floor((bs.debt * 10000) / bs.assets) : 0;
+    const avgMonthlyRevenue = totals.revenue / 12;
+    const currentLiquidityMonths = avgMonthlyRevenue > 0
+      ? Math.round((bs.cash / avgMonthlyRevenue) * 10) / 10
+      : (bs.cash > 0 ? 99 : 0);
+    const roaBasis = bs.assets > 0 ? Math.floor((statement.netIncome * 10000) / bs.assets) : 0;
+    const roeBasis = bs.equity > 0 ? Math.floor((statement.netIncome * 10000) / bs.equity) : 0;
+
+    const previousYear = state.yearlySummaries.at(-1);
+    let revenueGrowthBasis: number | undefined;
+    let profitGrowthBasis: number | undefined;
+    if (previousYear && previousYear.totals.revenue > 0) {
+      revenueGrowthBasis = Math.floor(((totals.revenue - previousYear.totals.revenue) * 10000) / previousYear.totals.revenue);
+    }
+    if (previousYear && previousYear.netIncome !== 0) {
+      profitGrowthBasis = Math.floor(((statement.netIncome - previousYear.netIncome) * 10000) / Math.abs(previousYear.netIncome));
+    }
+
+    financialRatios = {
+      grossMarginBasis,
+      operatingMarginBasis,
+      netMarginBasis,
+      equityRatioBasis,
+      currentLiquidityMonths,
+      debtRatioBasis,
+      roaBasis,
+      roeBasis,
+      revenueGrowthBasis,
+      profitGrowthBasis,
+    };
+
+    reviewComment = generateFinancialReview(statement, financialRatios);
+  }
+
   const summary: PeriodSummary = {
     label: calendarLabel(state.startYear, kind === 'month' ? startWeek : startWeek, kind),
     kind,
@@ -456,6 +590,12 @@ function closePeriod(state: GameState, kind: 'month' | 'year'): PeriodSummary {
     totals: { ...totals },
     netIncome: statement.netIncome,
     cashEnd: state.company.accounts.cash,
+    balanceSheet: bs,
+    incomeStatement: statement,
+    expenseBreakdown,
+    productSales,
+    financialRatios,
+    reviewComment,
   };
   return summary;
 }
@@ -752,7 +892,9 @@ function updateArchiveAndMorale(state: GameState, netIncome: Money): void {
     if (archived) {
       archived.totalUnitsSold = product.totalUnitsSold;
       archived.totalRevenue = product.totalRevenue;
-      archived.totalProfit = Math.floor(product.totalRevenue * 0.22);
+      archived.totalProfit = product.totalCogs !== undefined
+        ? (product.totalRevenue - product.totalCogs)
+        : Math.floor(product.totalRevenue * 0.22);
       if (product.lastWeekShareBasis > archived.peakShareBasis) {
         archived.peakShareBasis = product.lastWeekShareBasis;
       }
@@ -803,8 +945,13 @@ export function advanceWeek(state: GameState, options: { allowShortfall?: boolea
     defectUnits: production.defects,
     categoryShares: sales.categoryShares,
     productionShortfalls: production.shortfalls,
+    productSales: sales.productSales,
   };
   draft.lastWeek = weekReport;
+  draft.weeklyReports = draft.weeklyReports ?? [];
+  draft.weeklyReports.push(weekReport);
+  if (draft.weeklyReports.length > 300) draft.weeklyReports.shift();
+
   updateArchiveAndMorale(draft, weekRevenue - weekExpenses);
 
   if (draft.company.accounts.payable > 0) {
@@ -824,6 +971,11 @@ export function advanceWeek(state: GameState, options: { allowShortfall?: boolea
     draft.totals.profit += summary.netIncome;
     draft.monthTotals = emptyPeriodTotals(draft.company.accounts.cash);
     draft.monthStartWeek = draft.week;
+    for (const product of draft.company.products) {
+      product.monthUnitsSold = 0;
+      product.monthRevenue = 0;
+      product.monthCogs = 0;
+    }
     refreshMeetingProposals(draft);
     simulateRivalActions(draft);
     checkHistoricalEvents(draft);
