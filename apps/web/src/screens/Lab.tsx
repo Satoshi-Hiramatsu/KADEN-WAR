@@ -4,6 +4,7 @@ import {
   categorySegments,
   findCategory,
   unitsFromWorkload,
+  type CategoryDefinition,
   type CategoryId,
 } from '../../../../packages/content/src/categories';
 import { economyRules, weeksPerYear } from '../../../../packages/content/src/rules';
@@ -14,9 +15,9 @@ import {
   researchThemes,
   techName,
 } from '../../../../packages/content/src/technology';
-import { defaultModuleIds, evaluateDesign, maxQualityLevel } from '../../../../packages/simulation/src/design';
+import { defaultModuleIds, evaluateCategoryUnlock, evaluateDesign, maxQualityLevel } from '../../../../packages/simulation/src/design';
 import { formatMoney, formatUnitPrice, formatUnits } from '../../../../packages/simulation/src/money';
-import { departmentReports } from '../../../../packages/simulation/src/selectors';
+import { buildCategoryUnlockContext, departmentReports } from '../../../../packages/simulation/src/selectors';
 import { productionCapacityWorkload } from '../../../../packages/simulation/src/week';
 import type { GameState } from '../../../../packages/simulation/src/types';
 import {
@@ -31,9 +32,13 @@ import {
 } from '../components/ui';
 import { useGameStore } from '../store';
 
-/** その年・その技術で設計できる分類を、分野ごとにまとめて選択肢にする。 */
-function designableCategories(year: number, owned: readonly string[]) {
-  return categories.filter(category => category.availableFrom <= year && owned.includes(category.requiredTechId));
+/** その年・技術・生産能力・実績・資金・販路・ライバル動向で設計できる分類を選択肢にする。 */
+function designableCategories(
+  year: number,
+  owned: readonly string[],
+  unlockContext: ReturnType<typeof buildCategoryUnlockContext>,
+) {
+  return categories.filter(category => evaluateCategoryUnlock(category, owned, year, unlockContext).ok);
 }
 
 export function Lab({ game }: { game: GameState }) {
@@ -43,8 +48,12 @@ export function Lab({ game }: { game: GameState }) {
   const report = departmentReports(game).find(entry => entry.executiveId === 'design');
   const owned = game.company.ownedTechIds;
   const currentYear = game.startYear + Math.floor(game.week / weeksPerYear);
+  const unlockContext = useMemo(() => buildCategoryUnlockContext(game), [game]);
 
-  const designable = useMemo(() => designableCategories(currentYear, owned), [currentYear, owned]);
+  const designable = useMemo(
+    () => designableCategories(currentYear, owned, unlockContext),
+    [currentYear, owned, unlockContext],
+  );
   const firstDesignable = designable[0]?.id ?? 'battery-dry';
 
   const [categoryId, setCategoryId] = useState<CategoryId>(firstDesignable);
@@ -60,8 +69,8 @@ export function Lab({ game }: { game: GameState }) {
   const category = selected ?? designable[0] ?? findCategory('battery-dry');
 
   const evaluation = useMemo(
-    () => evaluateDesign({ categoryId, moduleIds, qualityLevel: quality, ownedTechIds: owned, currentYear }),
-    [categoryId, moduleIds, quality, owned, currentYear],
+    () => evaluateDesign({ categoryId, moduleIds, qualityLevel: quality, ownedTechIds: owned, currentYear, unlockContext }),
+    [categoryId, moduleIds, quality, owned, currentYear, unlockContext],
   );
 
   function changeCategory(next: CategoryId) {
@@ -83,6 +92,14 @@ export function Lab({ game }: { game: GameState }) {
   const upcoming = categories.filter(
     entry => entry.availableFrom > currentYear && entry.availableFrom <= currentYear + 3,
   );
+
+  // 年も基礎技術もそろっているのに、生産能力・資金・実績・販路のどれかが足りず着手できない分類。
+  const gatedByOtherAxis: { entry: CategoryDefinition; error: string }[] = [];
+  for (const entry of categories) {
+    if (entry.availableFrom > currentYear || !owned.includes(entry.requiredTechId)) continue;
+    const check = evaluateCategoryUnlock(entry, owned, currentYear, unlockContext);
+    if (!check.ok) gatedByOtherAxis.push({ entry, error: check.error });
+  }
 
   return (
     <>
@@ -262,6 +279,20 @@ export function Lab({ game }: { game: GameState }) {
                   <li key={entry.id}>
                     <strong>{entry.availableFrom}年</strong>：{entry.name}
                     <small>（必要な技術：{techName(entry.requiredTechId)}）</small>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          ) : null}
+
+          {gatedByOtherAxis.length > 0 ? (
+            <Panel eyebrow="03.5 / 条件待ち" title="あと一歩で着手できる製品">
+              <p>年代も基礎技術もそろっていますが、社内の体制が追いついていません。</p>
+              <ul className="upcoming-list">
+                {gatedByOtherAxis.map(({ entry, error }) => (
+                  <li key={entry.id}>
+                    <strong>{entry.name}</strong>
+                    <small>{error}</small>
                   </li>
                 ))}
               </ul>

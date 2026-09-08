@@ -5,6 +5,7 @@ import { maxSelectableFeatures, unlockedFeaturesFor } from '../../../../packages
 import { findMeetingCast, type MeetingCastId } from '../../../../packages/content/src/meetingCast';
 import { evaluateDesign, featureDevCostFor, featureUnitCostFor } from '../../../../packages/simulation/src/design';
 import { evaluateDevelopmentMeeting, type MeetingAttendeeId, type MeetingTone } from '../../../../packages/simulation/src/meeting';
+import { buildCategoryUnlockContext } from '../../../../packages/simulation/src/selectors';
 import { productionCapacityWorkload } from '../../../../packages/simulation/src/week';
 import { formatMoney, formatUnitPrice, formatUnits } from '../../../../packages/simulation/src/money';
 import type { GameState } from '../../../../packages/simulation/src/types';
@@ -94,6 +95,7 @@ export function DevelopmentMeeting({ game }: { game: GameState }) {
     ownedTechIds: owned,
     featureIds: draft.featureIds,
     currentYear,
+    unlockContext: buildCategoryUnlockContext(game),
   });
 
   const meetingEvaluation = evaluation.ok ? evaluateDevelopmentMeeting(game, evaluation.spec) : null;

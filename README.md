@@ -7,7 +7,7 @@
 1953年のテレビ本放送、1955年の電気釜、1950年代後半の「三種の神器」ブームまで、製品が世に出る順番は実際の年代に合わせています。
 
 [![Cloudflare Workers](https://img.shields.io/badge/Deploy-Cloudflare%20Workers-orange.svg)](https://kaden-war.molkz.com/)
-[![Version](https://img.shields.io/badge/Version-V0.1.2-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-V0.1.3-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](tsconfig.json)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)](#素材名称の扱い)
 
@@ -180,7 +180,7 @@
 
 ## 現在の実装状況とロードマップ
 
-**最新リリース: V0.1.2（時代設定を1950年へ変更・製品分類30種へ拡張・乾電池等11分類のスプライト原画追加）**  
+**最新リリース: V0.1.3（製品分類に生産能力・資金・販路等のアンロック条件を追加・創業直後の役員会議と広告提案の不自然さを解消）**  
 *(※ゲーム製品版v1.0の完成ではありません)*
 
 | 分類 | 状態 | 実装内容 |

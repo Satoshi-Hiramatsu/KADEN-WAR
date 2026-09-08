@@ -9,6 +9,7 @@ import { evaluateDesign, type DesignSpec } from './design';
 import { payCash, post } from './ledger';
 import { evaluateDevelopmentMeeting, type MeetingAttendeeId } from './meeting';
 import { nextInt } from './rng';
+import { buildCategoryUnlockContext } from './selectors';
 import { productionCapacityWorkload, productRank } from './week';
 import type { AdvertisingCampaignType, CommandResult, DevelopmentProject, GameState, Money } from './types';
 
@@ -135,6 +136,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
         ownedTechIds: company.ownedTechIds,
         featureIds: command.featureIds ?? [],
         currentYear,
+        unlockContext: buildCategoryUnlockContext(draft),
       });
       if (!evaluation.ok) return fail(state, evaluation.error);
       const spec = evaluation.spec;
@@ -282,6 +284,7 @@ export function applyCommand(state: GameState, command: Command): CommandResult 
       break;
     }
     case 'setAdvertising': {
+      if (company.products.length === 0) return fail(state, '宣伝する製品がありません。まずは製品を開発してください。');
       if (command.budget < 30) return fail(state, '広告予算は30万円以上で指定してください。');
       if (company.accounts.cash < command.budget) return fail(state, `広告費${command.budget}万円を支払う現金がありません。`);
       const adYear = draft.startYear + Math.floor(draft.week / weeksPerYear);

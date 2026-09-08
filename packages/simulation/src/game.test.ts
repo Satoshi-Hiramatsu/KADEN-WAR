@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { findCategory } from '../../content/src/categories';
 import { applyCommand, loanLimit, type Command } from './commands';
-import { defaultModuleIds, evaluateDesign } from './design';
+import { defaultModuleIds, emptyCategoryUnlockContext, evaluateCategoryUnlock, evaluateDesign } from './design';
 import { stateHash } from './hash';
 import { balanceSheet, cashFlowStatement } from './ledger';
 import { evaluateDevelopmentMeeting } from './meeting';
+import { buildCategoryUnlockContext } from './selectors';
 import { createGame } from './setup';
 import { advanceWeek, advanceWeeks, productionCapacityWorkload } from './week';
 import type { GameState } from './types';
@@ -213,6 +215,117 @@ describe('設計と研究', () => {
   });
 });
 
+describe('製品分類のアンロック条件', () => {
+  it('生産能力が足りない分類は設計できない（洗濯機）', () => {
+    const category = findCategory('washer')!;
+    const short = evaluateCategoryUnlock(category, ['tech-washing-basic'], 1953, {
+      ...emptyCategoryUnlockContext,
+      workloadCapacity: 1600,
+    });
+    expect(short.ok).toBe(false);
+    const enough = evaluateCategoryUnlock(category, ['tech-washing-basic'], 1953, {
+      ...emptyCategoryUnlockContext,
+      workloadCapacity: 3000,
+    });
+    expect(enough.ok).toBe(true);
+  });
+
+  it('資金が足りない分類は設計できない（テープレコーダー）', () => {
+    const category = findCategory('tape-recorder')!;
+    const poor = evaluateCategoryUnlock(category, ['tech-magnetic'], 1954, emptyCategoryUnlockContext);
+    expect(poor.ok).toBe(false);
+    const funded = evaluateCategoryUnlock(category, ['tech-magnetic'], 1954, {
+      ...emptyCategoryUnlockContext,
+      cash: 800,
+    });
+    expect(funded.ok).toBe(true);
+  });
+
+  it('販路が足りない分類は設計できない（白黒テレビ）', () => {
+    const category = findCategory('television')!;
+    const noChannels = evaluateCategoryUnlock(category, ['tech-imaging-basic'], 1953, emptyCategoryUnlockContext);
+    expect(noChannels.ok).toBe(false);
+    const wired = evaluateCategoryUnlock(category, ['tech-imaging-basic'], 1953, {
+      ...emptyCategoryUnlockContext,
+      channelUnits: 3,
+    });
+    expect(wired.ok).toBe(true);
+  });
+
+  it('同系統の発売実績が足りない分類は設計できない（電蓄）', () => {
+    const category = findCategory('record-player')!;
+    const inexperienced = evaluateCategoryUnlock(category, ['tech-record'], 1952, emptyCategoryUnlockContext);
+    expect(inexperienced.ok).toBe(false);
+    const experienced = evaluateCategoryUnlock(category, ['tech-record'], 1952, {
+      ...emptyCategoryUnlockContext,
+      segmentApprovedCounts: { audio: 1 },
+    });
+    expect(experienced.ok).toBe(true);
+  });
+
+  it('複合技術と資金の両方が要る分類は片方だけでは設計できない（カラーテレビ）', () => {
+    const category = findCategory('television-color')!;
+    const techOnly = evaluateCategoryUnlock(category, ['tech-imaging-color'], 1960, emptyCategoryUnlockContext);
+    expect(techOnly.ok).toBe(false);
+    const techAndCashButNoSecondTech = evaluateCategoryUnlock(category, ['tech-imaging-color'], 1960, {
+      ...emptyCategoryUnlockContext,
+      cash: 6000,
+    });
+    expect(techAndCashButNoSecondTech.ok).toBe(false);
+    const ready = evaluateCategoryUnlock(category, ['tech-imaging-color', 'tech-production-2'], 1960, {
+      ...emptyCategoryUnlockContext,
+      cash: 6000,
+    });
+    expect(ready.ok).toBe(true);
+  });
+
+  it('ライバルが動きを見せた分類は、生産能力等が足りなくても対抗開発として設計できる（技術は免除されない）', () => {
+    const category = findCategory('washer')!;
+    const withoutRivalMove = evaluateCategoryUnlock(category, ['tech-washing-basic'], 1953, {
+      ...emptyCategoryUnlockContext,
+      workloadCapacity: 0,
+    });
+    expect(withoutRivalMove.ok).toBe(false);
+    const withRivalMove = evaluateCategoryUnlock(category, ['tech-washing-basic'], 1953, {
+      ...emptyCategoryUnlockContext,
+      workloadCapacity: 0,
+      rivalTargetedCategoryIds: ['washer'],
+    });
+    expect(withRivalMove.ok).toBe(true);
+    const missingTechEvenWithRivalMove = evaluateCategoryUnlock(category, [], 1953, {
+      ...emptyCategoryUnlockContext,
+      rivalTargetedCategoryIds: ['washer'],
+    });
+    expect(missingTechEvenWithRivalMove.ok).toBe(false);
+  });
+
+  it('研究所の設計画面は、実際の会社状態からアンロック文脈を組み立てて判定する（統合テスト）', () => {
+    let state = newGame();
+    state = {
+      ...state,
+      week: 48 * 3,
+      company: {
+        ...state.company,
+        ownedTechIds: [...state.company.ownedTechIds, 'tech-washing-basic'],
+        accounts: { ...state.company.accounts, cash: 3000 },
+      },
+    };
+    const blocked = applyCommand(state, {
+      type: 'startDevelopment', name: '洗濯機試作', categoryId: 'washer',
+      moduleIds: defaultModuleIds('washer'), qualityLevel: 0,
+    });
+    expect(blocked.ok).toBe(false);
+
+    const invested = must(applyCommand(state, { type: 'investEquipment', units: 4 }));
+    expect(buildCategoryUnlockContext(invested).workloadCapacity).toBeGreaterThanOrEqual(3000);
+    const started = must(applyCommand(invested, {
+      type: 'startDevelopment', name: '洗濯機試作', categoryId: 'washer',
+      moduleIds: defaultModuleIds('washer'), qualityLevel: 0,
+    }));
+    expect(started.company.projects.length).toBe(1);
+  });
+});
+
 describe('開発会議', () => {
   it('付加価値項目は先進性・目新しさ・実用性と原価・性能に反映される', () => {
     const state = newGame();
@@ -375,7 +488,7 @@ describe('資金不足と借入', () => {
 
 describe('本格経営機能（広告・人事・会議・アーカイブ）', () => {
   it('その年に無い媒体は使えず、新聞広告なら1950年から打てる', () => {
-    let state = newGame();
+    let state = releaseFirstProduct(newGame());
     const initialBrand = state.company.brandBasis;
     // テレビ放送が始まるのは1953年。1950年にテレビCMは打てない。
     expect(applyCommand(state, { type: 'setAdvertising', campaign: 'tv', budget: 150 }).ok).toBe(false);
@@ -392,7 +505,7 @@ describe('本格経営機能（広告・人事・会議・アーカイブ）', (
   });
 
   it('1953年になればテレビCMを打てる', () => {
-    const base = newGame();
+    const base = releaseFirstProduct(newGame());
     const state: GameState = { ...base, week: 48 * 3 };
     const advertised = must(applyCommand(state, { type: 'setAdvertising', campaign: 'tv', budget: 150 }));
     expect(advertised.company.advertising.activeCampaign).toBe('tv');

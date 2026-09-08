@@ -143,30 +143,34 @@ export function SalesOffice({ game }: { game: GameState }) {
               </div>
             ) : null}
 
-            <div className="ad-campaign-options">
-              {adCampaigns.map(campaign => {
-                const usable = currentYear >= campaign.availableFrom;
-                return (
-                  <div className={usable ? 'ad-card' : 'ad-card locked'} key={campaign.id}>
-                    <h4>{campaign.name}</h4>
-                    <p>{campaign.description}</p>
-                    <p className="spec">
-                      需要ブースト: <strong>+{Math.round(campaign.boostBasis / 100)}%</strong> / 期間: 4週間
-                      {usable ? '' : ` / ${campaign.availableFrom}年から`}
-                    </p>
-                    <button
-                      className={campaign.id === 'tv' ? undefined : 'secondary'}
-                      onClick={() => dispatch({ type: 'setAdvertising', campaign: campaign.id, budget: campaign.cost })}
-                      disabled={!usable || game.company.accounts.cash < campaign.cost}
-                    >
-                      {usable
-                        ? `${campaign.name}を打つ（費用 ${campaign.cost}万円）`
-                        : `${campaign.availableFrom}年まで打てない`}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+            {products.length === 0 ? (
+              <p>宣伝する製品がまだありません。まずは研究所で製品を開発してください。</p>
+            ) : (
+              <div className="ad-campaign-options">
+                {adCampaigns.map(campaign => {
+                  const usable = currentYear >= campaign.availableFrom;
+                  return (
+                    <div className={usable ? 'ad-card' : 'ad-card locked'} key={campaign.id}>
+                      <h4>{campaign.name}</h4>
+                      <p>{campaign.description}</p>
+                      <p className="spec">
+                        需要ブースト: <strong>+{Math.round(campaign.boostBasis / 100)}%</strong> / 期間: 4週間
+                        {usable ? '' : ` / ${campaign.availableFrom}年から`}
+                      </p>
+                      <button
+                        className={campaign.id === 'tv' ? undefined : 'secondary'}
+                        onClick={() => dispatch({ type: 'setAdvertising', campaign: campaign.id, budget: campaign.cost })}
+                        disabled={!usable || game.company.accounts.cash < campaign.cost}
+                      >
+                        {usable
+                          ? `${campaign.name}を打つ（費用 ${campaign.cost}万円）`
+                          : `${campaign.availableFrom}年まで打てない`}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </Panel>
         </ScreenColumn>
 

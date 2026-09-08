@@ -1,4 +1,4 @@
-import { findCategory, type CategoryDefinition, type CategoryId } from '../../content/src/categories';
+import { findCategory, segmentName, type CategoryDefinition, type CategoryId, type CategorySegmentId } from '../../content/src/categories';
 import {
   extraDevWeeksForFeatureCount,
   featureAllowsCategory,
@@ -6,7 +6,83 @@ import {
   maxSelectableFeatures,
   type FeatureOption,
 } from '../../content/src/features';
-import { findModule, moduleAllowsCategory, moduleSlots, modulesFor } from '../../content/src/technology';
+import { findModule, moduleAllowsCategory, moduleSlots, modulesFor, techName } from '../../content/src/technology';
+
+/** 技術以外の解禁条件（生産能力・累積実績・資金・販路・ライバル動向）の判定に使う文脈。 */
+export type CategoryUnlockContext = {
+  /** 週あたりの生産能力（工数）。 */
+  workloadCapacity: number;
+  /** 手元現金（万円）。 */
+  cash: number;
+  /** 販路拠点数の合計（直営店＋系列店）。 */
+  channelUnits: number;
+  /** 系列（segment）ごとに、これまで発売にこぎ着けた製品数。 */
+  segmentApprovedCounts: Partial<Record<CategorySegmentId, number>>;
+  /** 直近でライバルが動きを見せた製品分類ID。 */
+  rivalTargetedCategoryIds: readonly string[];
+};
+
+/** 文脈が渡されない呼び出し（テストや簡易プレビュー）向けの、追加条件なし扱いの既定値。 */
+export const emptyCategoryUnlockContext: CategoryUnlockContext = {
+  workloadCapacity: 0,
+  cash: 0,
+  channelUnits: 0,
+  segmentApprovedCounts: {},
+  rivalTargetedCategoryIds: [],
+};
+
+export type CategoryUnlockCheck = { ok: true } | { ok: false; error: string };
+
+/**
+ * 分類そのものの解禁判定。技術（基礎＋複合）は常に必須。
+ * 生産能力・累積実績・資金・販路は、ライバルが同じ分類で動きを見せていれば
+ * 「対抗開発」として免除される。
+ */
+export function evaluateCategoryUnlock(
+  category: CategoryDefinition,
+  ownedTechIds: readonly string[],
+  currentYear: number | undefined,
+  context: CategoryUnlockContext,
+): CategoryUnlockCheck {
+  if (currentYear !== undefined && currentYear < category.availableFrom) {
+    return { ok: false, error: `${category.name}が世に出るのは${category.availableFrom}年からです。` };
+  }
+  if (!ownedTechIds.includes(category.requiredTechId)) {
+    return { ok: false, error: `${category.name}の設計には基礎技術「${techName(category.requiredTechId)}」が必要です。` };
+  }
+  const missingAdditionalTechIds = category.additionalTechIds.filter(id => !ownedTechIds.includes(id));
+  if (missingAdditionalTechIds.length > 0) {
+    return {
+      ok: false,
+      error: `${category.name}の設計にはさらに「${missingAdditionalTechIds.map(techId => techName(techId)).join('、')}」が要ります。`,
+    };
+  }
+
+  const rivalBypass = category.rivalTriggerCategoryId !== null
+    && context.rivalTargetedCategoryIds.includes(category.rivalTriggerCategoryId);
+  if (rivalBypass) return { ok: true };
+
+  if (context.workloadCapacity < category.requiredWorkloadCapacity) {
+    return {
+      ok: false,
+      error: `${category.name}の設計には週${category.requiredWorkloadCapacity.toLocaleString('ja-JP')}工数以上の生産能力が要ります。設備投資を進めてください。`,
+    };
+  }
+  if (context.cash < category.requiredCash) {
+    return { ok: false, error: `${category.name}の設計には手元資金${category.requiredCash}万円以上が要ります。` };
+  }
+  if (context.channelUnits < category.requiredChannelUnits) {
+    return { ok: false, error: `${category.name}の設計には販路${category.requiredChannelUnits}拠点以上が要ります。` };
+  }
+  const approved = context.segmentApprovedCounts[category.segment] ?? 0;
+  if (approved < category.requiredSegmentApprovedCount) {
+    return {
+      ok: false,
+      error: `${category.name}の設計には同系統（${segmentName(category.segment)}）で発売実績${category.requiredSegmentApprovedCount}件以上が要ります（現在${approved}件）。`,
+    };
+  }
+  return { ok: true };
+}
 
 export type DesignSpec = {
   categoryId: CategoryId;
@@ -42,6 +118,8 @@ export type DesignInput = {
   featureIds?: readonly string[];
   /** 付加価値項目と製品分類の解禁判定に使う現在年。省略時は年の判定を行わない。 */
   currentYear?: number;
+  /** 生産能力・累積実績・資金・販路の解禁判定に使う文脈。省略時は追加条件なし扱い。 */
+  unlockContext?: CategoryUnlockContext;
 };
 
 /** 分類の標準原価に対する万分率を、円の実額へ直す。 */
@@ -61,12 +139,13 @@ function devCostFromBasis(category: CategoryDefinition, basis: number): number {
 export function evaluateDesign(input: DesignInput): DesignEvaluation {
   const category = findCategory(input.categoryId);
   if (!category) return { ok: false, error: '製品分類が見つかりません。' };
-  if (input.currentYear !== undefined && input.currentYear < category.availableFrom) {
-    return { ok: false, error: `${category.name}が世に出るのは${category.availableFrom}年からです。` };
-  }
-  if (!input.ownedTechIds.includes(category.requiredTechId)) {
-    return { ok: false, error: `${category.name}の設計には基礎技術が必要です。` };
-  }
+  const unlockCheck = evaluateCategoryUnlock(
+    category,
+    input.ownedTechIds,
+    input.currentYear,
+    input.unlockContext ?? emptyCategoryUnlockContext,
+  );
+  if (!unlockCheck.ok) return unlockCheck;
   if (!Number.isInteger(input.qualityLevel) || input.qualityLevel < 0 || input.qualityLevel > maxQualityLevel) {
     return { ok: false, error: `品質投資は0〜${maxQualityLevel}で指定してください。` };
   }

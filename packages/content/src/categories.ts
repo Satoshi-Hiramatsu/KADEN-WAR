@@ -53,6 +53,21 @@ export type CategoryDefinition = {
   availableFrom: number;
   /** この分類の設計に必要な基礎技術。 */
   requiredTechId: string;
+  /** 基礎技術に加えて必要な技術（複合要件）。空なら追加なし。 */
+  additionalTechIds: readonly string[];
+  /** 設計に必要な週あたり生産能力（工数）。0なら制限なし。 */
+  requiredWorkloadCapacity: number;
+  /** 同じ系列（segment）で発売実績のある製品数の下限。0なら制限なし。 */
+  requiredSegmentApprovedCount: number;
+  /** 設計に必要な手元資金（万円）。0なら制限なし。 */
+  requiredCash: number;
+  /** 設計に必要な販路拠点数（直営店＋系列店の合計）。0なら制限なし。 */
+  requiredChannelUnits: number;
+  /**
+   * ライバルがこの分類IDの製品で動きを見せると、上記4条件（技術は除く）を
+   * 免除して対抗開発に踏み切れる。
+   */
+  rivalTriggerCategoryId: CategoryId | null;
   /** 市場の標準的な価格（円）。魅力度の基準になる。 */
   referencePrice: number;
   /** 標準構成の製造原価（円）。 */
@@ -197,23 +212,63 @@ const categoryRows: CategoryRow[] = [
     '少年の憧れの高級玩具。走行の滑らかさに小型電動機の腕が出る。'],
 ];
 
-export const categories: readonly CategoryDefinition[] = categoryRows.map(row => ({
-  id: row[0],
-  name: row[1],
-  shortName: row[2],
-  segment: row[3],
-  availableFrom: row[4],
-  requiredTechId: row[5],
-  referencePrice: row[6],
-  baseUnitCost: row[7],
-  basePerformance: 100,
-  baseDevWeeks: row[8],
-  baseDevCost: row[9],
-  suggestedMarginBasis: row[10],
-  workloadPer100Units: row[11],
-  demand: row[12].map(([year, unitsPerWeek]) => ({ year, unitsPerWeek })),
-  description: row[13],
-}));
+/**
+ * 主要な製品分類の追加アンロック要件。ここに載らない分類は、これまでどおり
+ * 「世に出た年 × 基礎技術」だけで設計できる。花形の白物・映像・玩具の一部にだけ、
+ * 生産能力・累積実績・資金力・販路・ライバル動向という追加の軸を持たせている。
+ */
+const categoryUnlockOverrides: Partial<Record<CategoryId, {
+  additionalTechIds?: readonly string[];
+  requiredWorkloadCapacity?: number;
+  requiredSegmentApprovedCount?: number;
+  requiredCash?: number;
+  requiredChannelUnits?: number;
+  rivalTriggerCategoryId?: CategoryId;
+}>> = {
+  // 電気洗濯機：量産できる体制がなければ着手できない。ライバルが動けば体制不問で対抗できる。
+  washer: { requiredWorkloadCapacity: 3000, rivalTriggerCategoryId: 'washer' },
+  // 白黒テレビ：売りさばく販路がなければ着手する意味が薄い。ライバル動向でも対抗開発を認める。
+  television: { requiredChannelUnits: 3, rivalTriggerCategoryId: 'television' },
+  // カラーテレビ：量産技術も要る高級品。体力（現金）も問われる。
+  'television-color': { additionalTechIds: ['tech-production-2'], requiredCash: 6000 },
+  // 電気掃除機：モーター応用の経験（同系列で2件の発売実績）を積んでから。
+  vacuum: { requiredSegmentApprovedCount: 2 },
+  // テープレコーダー：高級機ゆえ手元資金が要る。
+  'tape-recorder': { requiredCash: 800 },
+  // 電蓄（レコード）：ラジオなどで音響の実績を1件積んでから手を出す商品。
+  'record-player': { requiredSegmentApprovedCount: 1 },
+  // 電気ミシン：内職需要をさばける量産体制が要る。
+  'sewing-machine': { requiredWorkloadCapacity: 2400 },
+  // 鉄道模型：専門店網がなければ売り歩けない高級玩具。
+  'toy-model-railway': { requiredChannelUnits: 2 },
+};
+
+export const categories: readonly CategoryDefinition[] = categoryRows.map(row => {
+  const extra = categoryUnlockOverrides[row[0]] ?? {};
+  return {
+    id: row[0],
+    name: row[1],
+    shortName: row[2],
+    segment: row[3],
+    availableFrom: row[4],
+    requiredTechId: row[5],
+    additionalTechIds: extra.additionalTechIds ?? [],
+    requiredWorkloadCapacity: extra.requiredWorkloadCapacity ?? 0,
+    requiredSegmentApprovedCount: extra.requiredSegmentApprovedCount ?? 0,
+    requiredCash: extra.requiredCash ?? 0,
+    requiredChannelUnits: extra.requiredChannelUnits ?? 0,
+    rivalTriggerCategoryId: extra.rivalTriggerCategoryId ?? null,
+    referencePrice: row[6],
+    baseUnitCost: row[7],
+    basePerformance: 100,
+    baseDevWeeks: row[8],
+    baseDevCost: row[9],
+    suggestedMarginBasis: row[10],
+    workloadPer100Units: row[11],
+    demand: row[12].map(([year, unitsPerWeek]) => ({ year, unitsPerWeek })),
+    description: row[13],
+  };
+});
 
 export function findCategory(id: string): CategoryDefinition | undefined {
   return categories.find(category => category.id === id);

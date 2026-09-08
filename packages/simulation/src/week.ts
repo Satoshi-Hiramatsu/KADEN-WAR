@@ -369,6 +369,55 @@ export function refreshMeetingProposals(state: GameState): void {
   const company = state.company;
   const proposals: MeetingProposal[] = [];
 
+  // 創業直後で製品が一つもない（発売中・開発中・歴代とも皆無）場合、
+  // 広告や品質管理研修など「売る/作る製品がある前提」の具申は成立しない。
+  // この段階では全役員が製品開発の着手を最優先で具申する。
+  const hasAnyProductHistory = company.products.length > 0
+    || company.projects.length > 0
+    || company.archive.length > 0;
+  if (!hasAnyProductHistory) {
+    const kickoffProposals: { executiveId: MeetingProposal['executiveId']; title: string; description: string }[] = [
+      {
+        executiveId: 'design',
+        title: '主力製品の設計に着手すべきです',
+        description: 'まだ当社には製品が一つもありません。研究所にて第一号製品の開発会議を開くべきと具申します。',
+      },
+      {
+        executiveId: 'sales',
+        title: 'まずは売る製品を用意すべきです',
+        description: '発売中の製品がなく、広告も販路開拓も打つ手がありません。製品ができてから改めて具申します。',
+      },
+      {
+        executiveId: 'production',
+        title: '生産計画は製品が決まってからです',
+        description: '生産すべき製品がまだ無い以上、設備投資も生産改善も時期尚早です。まずは製品開発を急いでください。',
+      },
+      {
+        executiveId: 'finance',
+        title: '開発資金を温存すべきです',
+        description: '売上の見込みが立つまでは、賞与や借入より開発費を優先して現金を残すべきと考えます。',
+      },
+      {
+        executiveId: 'personnel',
+        title: '品質研修は製品が決まってからです',
+        description: '品質管理研修も、対象となる製品があってこそ意味を持ちます。まずは開発を最優先にしましょう。',
+      },
+    ];
+    for (const kickoff of kickoffProposals) {
+      proposals.push({
+        id: `prop-${kickoff.executiveId}-${state.week}`,
+        executiveId: kickoff.executiveId,
+        title: kickoff.title,
+        description: kickoff.description,
+        cost: 0,
+        expectedEffect: '製品開発の着手（研究所で開発会議へ）',
+        accepted: false,
+      });
+    }
+    company.proposals = proposals;
+    return;
+  }
+
   // 1. 設計統括
   const unresearched = researchThemes.find(t => !company.ownedTechIds.includes(t.grantsTechId));
   if (unresearched) {

@@ -1,8 +1,10 @@
 import { findCategory, unitsFromWorkload, workloadForUnits } from '../../content/src/categories';
+import { channels } from '../../content/src/channels';
 import { executives, type ExecutiveId } from '../../content/src/executives';
 import { economyRules } from '../../content/src/rules';
 import { findResearchTheme } from '../../content/src/technology';
 import { calendarAt, formatCalendar } from './calendar';
+import type { CategoryUnlockContext } from './design';
 import { balanceSheet, cashFlowStatement, incomeStatement } from './ledger';
 import { formatBrand, formatMoney, formatUnitPrice, formatUnits } from './money';
 import { channelCapacityWorkload, channelWeeklyCost, evaluateMarket } from './market';
@@ -125,6 +127,30 @@ export function channelCapacityUnitsFor(state: GameState, categoryId: string): n
 
 export function lastWeekUnitsSold(state: GameState): number {
   return state.lastWeek?.unitsSold ?? 0;
+}
+
+/**
+ * 製品分類の解禁判定に使う文脈を、現在の会社状態から組み立てる。
+ * 実績（segmentApprovedCounts）は殿堂入り前の現役製品も含め、発売にこぎ着けた
+ * 全製品の archive（歴代名機図鑑）から数えるため、引退させても実績は減らない。
+ */
+export function buildCategoryUnlockContext(state: GameState): CategoryUnlockContext {
+  const company = state.company;
+  const segmentApprovedCounts: CategoryUnlockContext['segmentApprovedCounts'] = {};
+  for (const archived of company.archive) {
+    const category = findCategory(archived.categoryId);
+    if (!category) continue;
+    segmentApprovedCounts[category.segment] = (segmentApprovedCounts[category.segment] ?? 0) + 1;
+  }
+  const channelUnits = channels.reduce((sum, channel) => sum + company.channels[channel.id], 0);
+  const rivalTargetedCategoryIds = [...new Set(company.rivalActions.map(action => action.categoryId))];
+  return {
+    workloadCapacity: productionCapacityWorkload(state),
+    cash: company.accounts.cash,
+    channelUnits,
+    segmentApprovedCounts,
+    rivalTargetedCategoryIds,
+  };
 }
 
 function researchHeadline(state: GameState): string {
